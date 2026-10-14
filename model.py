@@ -1,0 +1,56 @@
+from ultralytics import YOLO
+
+from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QPushButton, QApplication
+from PySide6.QtGui import QImage, QPixmap, QPainter, QPen, QColor
+from PySide6.QtCore import QTimer, Qt, QRectF
+
+from config import *
+
+def worker(q_in, q_out, q_status):
+    try:
+        m = YOLO('./models/v6_960/weights/best.pt')
+        q_status.put("READY")
+    except Exception as e:
+        q_status.put(f"yolo startup error: {e}")
+        return
+    
+    while True:
+        try:
+            f = q_in.get()
+            r = m(f, verbose=False)[0] 
+
+            out = [( *b.xyxy[0].tolist(), r.names[int(b.cls[0])], float(b.conf[0]) )
+                   for b in r.boxes]
+            
+            q_out.put(out)
+        except Exception as e:
+            print(f"yolo loop error: {e}")
+            break
+
+class BoxesOverlay(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_AlwaysStackOnTop, True)
+        self.boxes = []  
+
+    def set_results(self, boxes):
+        self.boxes = boxes
+        self.update() 
+
+    def paintEvent(self, event):
+        if not self.boxes:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(QPen(QColor(255, 0, 0), 2))
+        
+        for x1, y1, x2, y2, name, cf in self.boxes:
+            rx = x1 * SCALE_X
+            ry = y1 * SCALE_Y
+            rw = (x2 - x1) * SCALE_X
+            rh = (y2 - y1) * SCALE_Y
+            
+            p.drawRect(QRectF(rx, ry, rw, rh))
+            p.drawText(QRectF(rx, ry - 14, 200, 14), f"{name} {cf:.2f}")
+        p.end()
