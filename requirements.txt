@@ -1,0 +1,3 @@
+pyside6
+ultralytics
+opencv-python
