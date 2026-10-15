@@ -1,10 +1,8 @@
 from ultralytics import YOLO
-
-from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QPushButton, QApplication
-from PySide6.QtGui import QImage, QPixmap, QPainter, QPen, QColor
-from PySide6.QtCore import QTimer, Qt, QRectF
-
-from config import *
+from PySide6.QtWidgets import QWidget
+from PySide6.QtGui import QPainter, QPen, QColor
+from PySide6.QtCore import Qt, QRectF
+from config import SCALE_X, SCALE_Y
 
 def worker(q_in, q_out, q_status):
     try:
@@ -23,11 +21,11 @@ def worker(q_in, q_out, q_status):
                    for b in r.boxes]
             
             q_out.put(out)
-        except Exception as e:
-            print(f"yolo loop error: {e}")
+            
+        except Exception:
             break
 
-class BoxesOverlay(QWidget):
+class BOXESoverlay(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -41,6 +39,7 @@ class BoxesOverlay(QWidget):
     def paintEvent(self, event):
         if not self.boxes:
             return
+        
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         p.setPen(QPen(QColor(255, 0, 0), 2))
