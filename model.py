@@ -11,7 +11,7 @@ def worker(q_in, q_out, q_status):
         
         if is_linux:
             # rpi prod
-            model_path = './models/v6_960/weights/best_ncnn_model'
+            model_path = './models/v6_960/weights/ncnn'
             target_device = "vulkan"
             print("[YOLO] rpi!")
         else:

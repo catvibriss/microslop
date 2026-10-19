@@ -40,7 +40,7 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
             '--codec', 'yuv420', 
             '--timeout', '0', 
             '--nopreview', 
-            '--stdout',
+            '-o', '-',
             '--parameters', CMD_FILE_PATH
         ]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

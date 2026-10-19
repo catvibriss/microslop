@@ -21,7 +21,7 @@ class YoloMode(QWidget):
         self.btn_setting.resize(160, 35)
 
 class UIoverlay(QWidget):
-    def __init__(self, main_window: Win, change_mode_callback):
+    def __init__(self, main_window, change_mode_callback):
         super().__init__(main_window)
         self.change_mode = change_mode_callback
         self.setAttribute(Qt.WA_TranslucentBackground)
