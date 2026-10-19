@@ -6,20 +6,22 @@ import subprocess
 import numpy as np
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 
-CMD_FILE_PATH = "/tmp/cam_cmds.txt"
+# CMD_FILE_PATH = "/tmp/cam_cmds.txt"
 
-def update_hardware_zoom(zoom_factor):
+def update_hardware_zoom(proc, zoom_factor):
+    if proc is None or proc.poll() is not None:
+        return
+
     if zoom_factor <= 1.0:
         roi_str = "roi 0.0,0.0,1.0,1.0\n"
-
     else:
         size = 1.0 / zoom_factor
         offset = (1.0 - size) / 2.0
         roi_str = f"roi {offset:.4f},{offset:.4f},{size:.4f},{size:.4f}\n"
     
     try:
-        with open(CMD_FILE_PATH, "w") as f:
-            f.write(roi_str)
+        proc.stdin.write(roi_str.encode())
+        proc.stdin.flush()
     except IOError:
         pass
 
@@ -30,9 +32,7 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
         buffer_container['zoom_factor'] = 1.0
         buffer_container['frame_idx'] = 0
     
-    if use_rpicam:
-        update_hardware_zoom(1.0)
-        
+    if use_rpicam:        
         cmd = [
             'rpicam-vid', 
             '--width', str(SCREEN_WIDTH), 
@@ -41,9 +41,11 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
             '--timeout', '0', 
             '--nopreview', 
             '-o', '-',
-            '--parameters', CMD_FILE_PATH
+            # '--parameters', CMD_FILE_PATH
         ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+
+        update_hardware_zoom(proc, 1.0)
 
         frame_size = SCREEN_WIDTH * SCREEN_HEIGHT * 3 // 2
         print(f"[camera] rpicam-vid. res: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
@@ -54,6 +56,7 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, SCREEN_HEIGHT)
         cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        proc = None
         print(f"[camera] openCV. res: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
 
     last_zoom = 1.0
@@ -66,7 +69,7 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
                 frame_idx = buffer_container.get('frame_idx', 0)
             
             if use_rpicam and current_zoom != last_zoom:
-                update_hardware_zoom(current_zoom)
+                update_hardware_zoom(proc, current_zoom)
                 last_zoom = current_zoom
 
             if use_rpicam:
@@ -97,9 +100,6 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
     finally:
         if use_rpicam: 
             proc.terminate()
-            if os.path.exists(CMD_FILE_PATH):
-                try: os.remove(CMD_FILE_PATH)
-                except: pass
         else: 
             cap.release()
         print("camera stopped")
