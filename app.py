@@ -11,7 +11,7 @@ q_in  = mp.Queue(maxsize=1)
 q_out = mp.Queue(maxsize=4)
 q_status = mp.Queue(maxsize=1)
 
-video_buffer_lock = threading.Lock()
+video_buffer_lock = mp.Lock()
 
 buffer_container = {
     'frame': None,
