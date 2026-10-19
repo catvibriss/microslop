@@ -7,20 +7,21 @@ import model
 import camera
 import gui
 
-q_in  = mp.Queue(maxsize=1)
-q_out = mp.Queue(maxsize=4)
-q_status = mp.Queue(maxsize=1)
-
-video_buffer_lock = mp.Lock()
-
-buffer_container = {
-    'frame': None,
-    'yolo_enabled': False
-}
-
 def main():
     mp.freeze_support()
+
     mp.set_start_method('spawn', force=True)
+    
+    q_in  = mp.Queue(maxsize=1)
+    q_out = mp.Queue(maxsize=4)
+    q_status = mp.Queue(maxsize=1)
+    video_buffer_lock = mp.Lock()
+
+    buffer_container = {
+        'frame': None,
+        'yolo_enabled': False
+    }
+
     app = QApplication(sys.argv)
     
     # YOLO worker
