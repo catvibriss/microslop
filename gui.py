@@ -1,7 +1,8 @@
 import queue
+import time
 from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QPushButton, QApplication, QStackedWidget
-from PySide6.QtGui import QImage, QPixmap, QPainter, QPen, QColor
-from PySide6.QtCore import QTimer, Qt, QRectF
+from PySide6.QtGui import QImage, QPixmap, QPainter, QColor, QFont
+from PySide6.QtCore import QTimer, Qt
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 import model
 
@@ -20,7 +21,7 @@ class YoloMode(QWidget):
         self.btn_setting.resize(160, 35)
 
 class UIoverlay(QWidget):
-    def __init__(self, main_window, change_mode_callback):
+    def __init__(self, main_window: Win, change_mode_callback):
         super().__init__(main_window)
         self.change_mode = change_mode_callback
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -35,11 +36,16 @@ class UIoverlay(QWidget):
         self.btn_yolo.move(150, 20)
         self.btn_yolo.resize(120, 35)
         self.btn_yolo.clicked.connect(lambda: self.change_mode("YOLO"))
-        
+
+        self.btn_zoom = QPushButton("zoom: 1.0x", self)
+        self.btn_zoom.move(300, 20)  
+        self.btn_zoom.resize(120, 35)
+        self.btn_zoom.clicked.connect(main_window.toggle_zoom)
+
         self.btn_close = QPushButton("close", self)
         self.btn_close.move(20, 70)
         self.btn_close.resize(100, 35)
-        self.btn_close.clicked.connect(QApplication.instance().quit)
+        self.btn_close.clicked.connect(main_window.close)
 
 
 class Win(QWidget):
@@ -51,6 +57,9 @@ class Win(QWidget):
         self.lock = video_buffer_lock
 
         self.current_mode = "CLEAR"
+        
+        self.last_time = time.time()
+        self.fps = 0.0
         
         self.setFixedSize(SCREEN_WIDTH, SCREEN_HEIGHT)
         layout = QGridLayout(self)
@@ -84,7 +93,22 @@ class Win(QWidget):
         self.t = QTimer(self)
         self.t.timeout.connect(self.update_ui)
         self.t.start(33)  
-        print("4-layer sandwich ready")
+        print("4-layer sandwich ready with *ZOOM*")
+
+    def toggle_zoom(self):
+        with self.lock:
+            current_zoom = self.buffer_container.get('zoom_factor', 1.0)
+            
+            if current_zoom == 1.0:
+                new_zoom = 2.0
+            elif current_zoom == 2.0:
+                new_zoom = 4.0
+            else:
+                new_zoom = 1.0
+                
+            self.buffer_container['zoom_factor'] = new_zoom
+            self.ui_overlay.btn_zoom.setText(f"zoom: {new_zoom:.1f}x")
+            print(f"zoom set to: {new_zoom:.1f}x")
 
     def handle_mode_change(self, mode_name):
         if mode_name == "CLEAR":
@@ -100,6 +124,12 @@ class Win(QWidget):
                 self.buffer_container['yolo_enabled'] = True
 
     def update_ui(self):
+        current_time = time.time()
+        delta = current_time - self.last_time
+        if delta > 0:
+            self.fps = 1.0 / delta
+        self.last_time = current_time
+
         boxes = self.boxes_overlay.boxes
         if self.current_mode == "YOLO":
             while True:
@@ -119,5 +149,26 @@ class Win(QWidget):
         if f is None: return
 
         qimg = QImage(f.data, SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH * 3, QImage.Format_RGB888)
+        
+        painter = QPainter(qimg)
+        painter.setPen(QColor(0, 255, 0))
+        painter.setFont(QFont("Arial", 16, QFont.Bold))
+        painter.drawText(SCREEN_WIDTH - 120, 30, f"FPS: {self.fps:.1f}")
+        painter.end()
+
         pm = QPixmap.fromImage(qimg)
         self.video_label.setPixmap(pm)
+
+    def closeEvent(self, event):
+        print("closing app...")
+        self.t.stop()
+        
+        if self.proc and self.proc.is_alive():
+            try:
+                self.proc.terminate()
+                self.proc.join(timeout=1.0)
+            except:
+                pass
+        
+        print("app closed!")
+        event.accept()

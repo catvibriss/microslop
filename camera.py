@@ -1,57 +1,105 @@
+import sys
+import os
 import cv2
 import queue
-import platform
-from config import SCREEN_WIDTH, SCREEN_HEIGHT, CAMERA_WIDTH, CAMERA_HEIGHT
+import subprocess
+import numpy as np
+from config import SCREEN_WIDTH, SCREEN_HEIGHT
 
+CMD_FILE_PATH = "/tmp/cam_cmds.txt"
 
-def cam_loop(q_in, buffer_container, video_buffer_lock):
-    if platform.system() == "Windows":
-        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-
-        read_frame = lambda: cap.read()
-        release = cap.release
+def update_hardware_zoom(zoom_factor):
+    if zoom_factor <= 1.0:
+        roi_str = "roi 0.0,0.0,1.0,1.0\n"
 
     else:
-        from picamera2 import Picamera2
+        size = 1.0 / zoom_factor
+        offset = (1.0 - size) / 2.0
+        roi_str = f"roi {offset:.4f},{offset:.4f},{size:.4f},{size:.4f}\n"
+    
+    try:
+        with open(CMD_FILE_PATH, "w") as f:
+            f.write(roi_str)
+    except IOError:
+        pass
 
-        cap = Picamera2()
-        cap.configure(cap.create_video_configuration(
-            main={"size": (CAMERA_WIDTH, CAMERA_HEIGHT), "format": "RGB888"}
-        ))
-        cap.start()
+def cam_loop(q_in, buffer_container, video_buffer_lock):
+    use_rpicam = sys.platform.startswith('linux')
+    
+    with video_buffer_lock:
+        buffer_container['zoom_factor'] = 1.0
+        buffer_container['frame_idx'] = 0
+    
+    if use_rpicam:
+        update_hardware_zoom(1.0)
+        
+        cmd = [
+            'rpicam-vid', 
+            '--width', str(SCREEN_WIDTH), 
+            '--height', str(SCREEN_HEIGHT),
+            '--codec', 'yuv420', 
+            '--timeout', '0', 
+            '--nopreview', 
+            '--stdout',
+            '--parameters', CMD_FILE_PATH
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        read_frame = lambda: (True, cap.capture_array())
-        release = cap.stop
+        frame_size = SCREEN_WIDTH * SCREEN_HEIGHT * 3 // 2
+        print(f"[camera] rpicam-vid. res: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
 
-    print(f"Camera ready. Size: {CAMERA_WIDTH}x{CAMERA_HEIGHT}")
+    else: # windows tests
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, SCREEN_WIDTH)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, SCREEN_HEIGHT)
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        print(f"[camera] openCV. res: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
+
+    last_zoom = 1.0
 
     try:
         while True:
-            ok, f_bgr = read_frame()
-            if not ok:
-                break
-
             with video_buffer_lock:
-                yolo_active = buffer_container.get('yolo_enabled', True)
+                current_zoom = buffer_container.get('zoom_factor', 1.0)
+                yolo_active = buffer_container.get('yolo_enabled', False)
+                frame_idx = buffer_container.get('frame_idx', 0)
+            
+            if use_rpicam and current_zoom != last_zoom:
+                update_hardware_zoom(current_zoom)
+                last_zoom = current_zoom
+
+            if use_rpicam:
+                raw = proc.stdout.read(frame_size)
+                if len(raw) < frame_size:
+                    err = proc.stderr.read().decode().strip()
+                    print(f"rpicam-vid err: {err}")
+                    break
+                
+                yuv = np.frombuffer(raw, dtype=np.uint8).reshape((SCREEN_HEIGHT * 3 // 2, SCREEN_WIDTH))
+                f_rgb = cv2.cvtColor(yuv, cv2.COLOR_YUV2RGB_I420)
+            else:
+                ok, f_bgr = cap.read()
+                if not ok: 
+                    break
+                f_rgb = cv2.cvtColor(f_bgr, cv2.COLOR_BGR2RGB)
 
             if yolo_active:
-                try:
-                    q_in.put(f_bgr.copy(), block=False)
-                except queue.Full:
+                try: 
+                    q_in.put(f_rgb.copy(), block=False)
+                except queue.Full: 
                     pass
-
-            f_resized = cv2.resize(
-                f_bgr, (SCREEN_WIDTH, SCREEN_HEIGHT),
-                interpolation=cv2.INTER_AREA
-            )
-            f_rgb = cv2.cvtColor(f_resized, cv2.COLOR_BGR2RGB)
 
             with video_buffer_lock:
                 buffer_container['frame'] = f_rgb.copy()
+                buffer_container['frame_idx'] = (frame_idx + 1) % 10000
 
     finally:
-        release()
+        if use_rpicam: 
+            proc.terminate()
+            if os.path.exists(CMD_FILE_PATH):
+                try: os.remove(CMD_FILE_PATH)
+                except: pass
+        else: 
+            cap.release()
+        print("camera stopped")

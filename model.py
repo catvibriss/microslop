@@ -1,3 +1,4 @@
+import sys
 from ultralytics import YOLO
 from PySide6.QtWidgets import QWidget
 from PySide6.QtGui import QPainter, QPen, QColor
@@ -6,7 +7,20 @@ from config import SCALE_X, SCALE_Y
 
 def worker(q_in, q_out, q_status):
     try:
-        m = YOLO('./models/v6_960/weights/best.pt')
+        is_linux = sys.platform.startswith('linux')
+        
+        if is_linux:
+            # rpi prod
+            model_path = './models/v6_960/weights/best_ncnn_model'
+            target_device = "vulkan"
+            print("[YOLO] rpi!")
+        else:
+            # win tests
+            model_path = './models/v6_960/weights/best.pt'
+            target_device = "cpu"
+            print("[YOLO] win!")
+            
+        m = YOLO(model_path)
         q_status.put("READY")
     except Exception as e:
         q_status.put(f"yolo startup error: {e}")
@@ -15,7 +29,10 @@ def worker(q_in, q_out, q_status):
     while True:
         try:
             f = q_in.get()
-            r = m(f, verbose=False)[0] 
+            if f is None: 
+                break
+                
+            r = m.predict(f, verbose=False, device=target_device, imgsz=960)[0] 
 
             out = [( *b.xyxy[0].tolist(), r.names[int(b.cls[0])], float(b.conf[0]) )
                    for b in r.boxes]
