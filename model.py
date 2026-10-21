@@ -17,28 +17,26 @@ def worker(q_in, q_out, q_status):
     except Exception as e:
         q_status.put(f"[yolo] startup error: {e}")
         return
-
-    last_one = None
+    
     while True:
         try:
             f = q_in.get()
             if f is None: 
                 break
                 
-            r = m.predict(f, verbose=False, device=target_device, imgsz=320)[0] # reduced for tests 
+            results = m.predict(f, verbose=False, device=target_device, imgsz=320)
+            r = results[0]
 
-            out = [( *b.xyxy[0].tolist(), r.names[int(b.cls[0])], float(b.conf[0]) )
-                   for b in r.boxes]
-            curr_one = len(out)
-
-            if last_one != curr_one:
-                print(f"[D yolo] found objects: {curr_one}")
-                last_one = curr_one
-
+            out = []
+            for b in r.boxes:
+                x1, y1, x2, y2 = b.xyxy[0].tolist()
+                cls_id = int(b.cls[0])
+                conf_val = float(b.conf[0])
+                out.append((x1, y1, x2, y2, r.names[cls_id], conf_val))
+            
             q_out.put(out)
             
-        except Exception as e:
-            print(f"[yolo] cycle err: {e}")
+        except Exception:
             break
 
 class BOXESoverlay(QWidget):
@@ -47,6 +45,10 @@ class BOXESoverlay(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_AlwaysStackOnTop, True)
         self.boxes = []  
+        
+        self.colors = {
+            "excessive_solder": QColor(120, 190, 255)
+        }
 
     def set_results(self, boxes):
         self.boxes = boxes
@@ -58,9 +60,11 @@ class BOXESoverlay(QWidget):
         
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(QPen(QColor(255, 0, 0), 2))
         
         for x1, y1, x2, y2, name, cf in self.boxes:
+            color = self.colors.get(name, QColor(255, 0, 0))
+            p.setPen(QPen(color, 2))
+            
             rx = x1 * SCALE_X
             ry = y1 * SCALE_Y
             rw = (x2 - x1) * SCALE_X
