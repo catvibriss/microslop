@@ -6,8 +6,6 @@ import subprocess
 import numpy as np
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 
-# CMD_FILE_PATH = "/tmp/cam_cmds.txt"
-
 def update_hardware_zoom(proc, zoom_factor):
     if proc is None or proc.poll() is not None:
         return
@@ -40,8 +38,8 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
             '--codec', 'yuv420', 
             '--timeout', '0', 
             '--nopreview', 
-            '-o', '-',
-            # '--parameters', CMD_FILE_PATH
+            '--keypress', 
+            '-o', '-',     
         ]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
 
@@ -80,16 +78,21 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
                     break
                 
                 yuv = np.frombuffer(raw, dtype=np.uint8).reshape((SCREEN_HEIGHT * 3 // 2, SCREEN_WIDTH))
+                
                 f_rgb = cv2.cvtColor(yuv, cv2.COLOR_YUV2RGB_I420)
+                f_yolo = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR_I420)
+
             else:
                 ok, f_bgr = cap.read()
                 if not ok: 
                     break
-                f_rgb = cv2.cvtColor(f_bgr, cv2.COLOR_BGR2RGB)
+
+                f_rgb = cv2.cvtColor(f_bgr, cv2.COLOR_BGR2RGB)     
+                f_yolo = f_bgr.copy()                          
 
             if yolo_active:
                 try: 
-                    q_in.put(f_rgb.copy(), block=False)
+                    q_in.put(f_yolo.copy(), block=False)
                 except queue.Full: 
                     pass
 
