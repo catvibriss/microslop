@@ -17,20 +17,24 @@ def worker(q_in, q_out, q_status):
     except Exception as e:
         q_status.put(f"[yolo] startup error: {e}")
         return
-    
+
+    last_one = None
     while True:
         try:
-            print("[D yolo] waiting q_in")
             f = q_in.get()
             if f is None: 
                 break
                 
-            r = m.predict(f, verbose=False, device=target_device, imgsz=960)[0] 
+            r = m.predict(f, verbose=False, device=target_device, imgsz=320)[0] # reduced for tests 
 
             out = [( *b.xyxy[0].tolist(), r.names[int(b.cls[0])], float(b.conf[0]) )
                    for b in r.boxes]
+            curr_one = len(out)
 
-            print(f"[D yolo] found objects: {len(out)}")
+            if last_one != curr_one:
+                print(f"[D yolo] found objects: {curr_one}")
+                last_one = curr_one
+
             q_out.put(out)
             
         except Exception as e:

@@ -1,5 +1,7 @@
 import os
-os.environ["QT_LOGGING_RULES"] = "qt.virtualkeyboard=false;*.debug=false;qt.wayland.debug=false"
+os.environ["QT_LOGGING_RULES"] = "*=false"
+os.environ["QT_QUIET"] = "1"
+os.environ["QT_DEBUG_PLUGINS"] = "0"
 
 import sys
 import threading
