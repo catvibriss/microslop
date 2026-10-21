@@ -9,7 +9,6 @@ import gui
 
 def main():
     mp.freeze_support()
-
     mp.set_start_method('spawn', force=True)
     
     q_in  = mp.Queue(maxsize=1)
@@ -27,18 +26,12 @@ def main():
     # YOLO worker
     p = mp.Process(target=model.worker, args=(q_in, q_out, q_status))
     p.start()
-    
-    status = q_status.get()
-    if status != "READY":
-        print(f"yolo error: {status}")
-        p.terminate()
-        return
 
     # camera thread
     threading.Thread(target=camera.cam_loop, args=(q_in, buffer_container, video_buffer_lock), daemon=True).start()
 
     # window :d
-    w = gui.Win(p, q_out, buffer_container, video_buffer_lock)
+    w = gui.Win(p, q_out, buffer_container, video_buffer_lock, q_status)
     w.show()
     
     sys.exit(app.exec())

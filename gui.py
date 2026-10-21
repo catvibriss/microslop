@@ -49,14 +49,16 @@ class UIoverlay(QWidget):
 
 
 class Win(QWidget):
-    def __init__(self, proc, q_out, buffer_container, video_buffer_lock):
+    def __init__(self, proc, q_out, buffer_container, video_buffer_lock, q_status):
         super().__init__()
         self.proc = proc  
         self.q_out = q_out
         self.buffer_container = buffer_container
         self.lock = video_buffer_lock
 
+        self.q_status = q_status
         self.current_mode = "CLEAR"
+        self.yolo_ready = False
         
         self.last_time = time.time()
         self.fps = 0.0
@@ -80,6 +82,7 @@ class Win(QWidget):
 
         self.ui_overlay = UIoverlay(self, self.handle_mode_change)        
         self.ui_overlay.setFixedSize(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.ui_overlay.setVisible(False)
 
         layout.addWidget(self.video_label, 0, 0)
         layout.addWidget(self.boxes_overlay, 0, 0)
@@ -94,6 +97,27 @@ class Win(QWidget):
         self.t.timeout.connect(self.update_ui)
         self.t.start(33)  
         print("4-layer sandwich ready with *ZOOM*")
+
+        self.yolo_ready_timer = QTimer(self)
+        self.yolo_ready_timer.timeout.connect(self.check_yolo_status)
+        self.yolo_ready_timer.start(50)
+
+    def check_yolo_status(self):
+        try:
+            status = self.q_status.get_nowait()
+            if status == "READY":
+                print("[GUI] yolo are ready!")
+                self.yolo_ready = True
+                self.yolo_ready_timer.stop()
+
+                self.ui_overlay.setVisible(True)
+                self.handle_mode_change("CLEAR")
+            else:
+                print(f"[GUI] error: {status}")
+                self.close()
+
+        except queue.Empty:
+            pass
 
     def toggle_zoom(self):
         with self.lock:
@@ -111,6 +135,9 @@ class Win(QWidget):
             print(f"zoom set to: {new_zoom:.1f}x")
 
     def handle_mode_change(self, mode_name):
+        if not self.yolo_ready and mode_name != "LOADING":
+            return
+
         if mode_name == "CLEAR":
             self.mode_overlay.setCurrentIndex(0)      
             self.current_mode = "CLEAR"
