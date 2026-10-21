@@ -15,11 +15,12 @@ def worker(q_in, q_out, q_status):
         m = YOLO(str(model_path))
         q_status.put("READY")
     except Exception as e:
-        q_status.put(f"yolo startup error: {e}")
+        q_status.put(f"[yolo] startup error: {e}")
         return
     
     while True:
         try:
+            print("[D yolo] waiting q_in")
             f = q_in.get()
             if f is None: 
                 break
@@ -28,10 +29,12 @@ def worker(q_in, q_out, q_status):
 
             out = [( *b.xyxy[0].tolist(), r.names[int(b.cls[0])], float(b.conf[0]) )
                    for b in r.boxes]
-            
+
+            print(f"[D yolo] found objects: {len(out)}")
             q_out.put(out)
             
-        except Exception:
+        except Exception as e:
+            print(f"[yolo] cycle err: {e}")
             break
 
 class BOXESoverlay(QWidget):

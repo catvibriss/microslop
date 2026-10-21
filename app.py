@@ -1,3 +1,6 @@
+import os
+os.environ["QT_LOGGING_RULES"] = "qt.virtualkeyboard=false;*.debug=false;qt.wayland.debug=false"
+
 import sys
 import threading
 import multiprocessing as mp
