@@ -1,8 +1,12 @@
 import queue
 import time
+
 from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QPushButton, QApplication, QStackedWidget
 from PySide6.QtGui import QImage, QPixmap, QPainter, QColor, QFont
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QTimer, Qt, QSize
+
+from utils import make_colored_svg 
+
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 import model
 
@@ -40,8 +44,10 @@ class UIoverlay(QWidget):
         self.btn_toggle = QPushButton("", self)
         self.btn_toggle.resize(self.collapsed_width, 150)
         self.btn_toggle.clicked.connect(self.toggle_menu)
-        
+
         svg_path = "img/menu.svg"
+        self.btn_toggle.setIcon(make_colored_svg(svg_path, Qt.white))
+        self.btn_toggle.setIconSize(QSize(28, 28))
 
         self.btn_toggle.setStyleSheet(f"""
             QPushButton {{
@@ -54,8 +60,6 @@ class UIoverlay(QWidget):
                 border-bottom-right-radius: 12px;
                 background-clip: border;
                 
-                qproperty-icon: url('{svg_path}');
-                qproperty-iconSize: 16px 16px;
                 padding-left: 2px;
             }}
             QPushButton:hover {{ 
@@ -105,14 +109,16 @@ class UIoverlay(QWidget):
             QPushButton {
                 background-color: rgba(255, 255, 255, 255);
                 color: #000000;
-                border: none;
-                border-bottom: 2px solid rgba(0, 0, 0, 30);
+                border-style: none none solid none;
+                border-width: 0px 0px 2px 0px;
+                border-color: transparent transparent #E1E1E1 transparent;
+                margin: 0px;
                 font-weight: normal;
                 text-align: left;
                 padding-left: 20px;
             }
-            QPushButton:hover { background-color: rgba(240, 240, 240, 255); }
-            QPushButton:pressed { background-color: rgba(220, 220, 220, 255); }
+            QPushButton:hover { background-color: rgb(240, 240, 240); }
+            QPushButton:pressed { background-color: rgb(220, 220, 220); }
         """
         
         for i, btn in enumerate(self.menu_buttons):
