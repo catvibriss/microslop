@@ -8,7 +8,6 @@ from config import SCALE_X, SCALE_Y
 
 def worker(q_in, q_out, q_status):
     try:
-        # win tests
         # model_path = Path("models") / "v6_960" / "best.pt"
         model_path = Path("models") / "v6_960" / "best.onnx"
         target_device = "cpu"

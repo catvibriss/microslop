@@ -23,29 +23,130 @@ class YoloMode(QWidget):
 class UIoverlay(QWidget):
     def __init__(self, main_window, change_mode_callback):
         super().__init__(main_window)
+
+        # init ==
         self.change_mode = change_mode_callback
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_AlwaysStackOnTop, True)
+
+        # setup ==
+        self.collapsed_width = 30
+        self.expanded_width = 250
+        self.is_expanded = False
+
+        self.resize(self.collapsed_width, SCREEN_HEIGHT)
+
+        # toggle  ==
+        self.btn_toggle = QPushButton("", self)
+        self.btn_toggle.resize(self.collapsed_width, 70)
+        self.btn_toggle.clicked.connect(self.toggle_menu)
         
+        svg_path = "img/menu.svg"
+
+        self.btn_toggle.setStyleSheet(f"""
+            QPushButton {{
+                background-color: rgba(255, 255, 255, 100);
+                
+                border: 3px solid #D4D4D4;
+                border-left-color: transparent;
+                
+                border-top-right-radius: 12px;
+                border-bottom-right-radius: 12px;
+                background-clip: border;
+                
+                qproperty-icon: url('{svg_path}');
+                qproperty-iconSize: 16px 16px;
+                padding-left: 2px;
+            }}
+            QPushButton:hover {{ 
+                background-color: rgba(255, 255, 255, 150);
+                border-color: #EAEAEA;
+                border-left-color: transparent;
+            }}
+            QPushButton:pressed {{ 
+                background-color: rgba(255, 255, 255, 200);
+                border-color: #FFFFFF;
+                border-left-color: transparent;
+            }}
+        """)
+
+        self.btn_toggle.move(0, (SCREEN_HEIGHT - self.btn_toggle.height()) // 2)
+
+        # menu ==
+        self.btn_height = 50
+        self.menu_buttons = []
+        # -- -- --
+
         self.btn_cam = QPushButton("clear", self)
-        self.btn_cam.move(20, 20)
-        self.btn_cam.resize(120, 35)
-        self.btn_cam.clicked.connect(lambda: self.change_mode("CLEAR"))
+        self.btn_cam.clicked.connect(lambda: self.select_mode("CLEAR"))
         
         self.btn_yolo = QPushButton("YOLO", self)
-        self.btn_yolo.move(150, 20)
-        self.btn_yolo.resize(120, 35)
-        self.btn_yolo.clicked.connect(lambda: self.change_mode("YOLO"))
-
-        self.btn_zoom = QPushButton("zoom: 1.0x", self)
-        self.btn_zoom.move(300, 20)  
-        self.btn_zoom.resize(120, 35)
-        self.btn_zoom.clicked.connect(main_window.toggle_zoom)
+        self.btn_yolo.clicked.connect(lambda: self.select_mode("YOLO"))
 
         self.btn_close = QPushButton("close", self)
-        self.btn_close.move(20, 70)
-        self.btn_close.resize(100, 35)
         self.btn_close.clicked.connect(main_window.close)
+
+        self.menu_buttons = [self.btn_cam, self.btn_yolo, self.btn_close]
+        # -- -- --
+
+        self.menu_height = len(self.menu_buttons) * self.btn_height
+        self.start_y = (SCREEN_HEIGHT - self.menu_height) // 2
+
+        self.menu_style = """
+            QPushButton {
+                background-color: rgba(255, 255, 255, 255);
+                color: #000000;
+                border: none;
+                border-bottom: 2px solid rgba(0, 0, 0, 30);
+                font-weight: normal;
+                text-align: left;
+                padding-left: 20px;
+            }
+            QPushButton:hover { background-color: rgba(240, 240, 240, 255); }
+            QPushButton:pressed { background-color: rgba(220, 220, 220, 255); }
+        """
+        
+        for i, btn in enumerate(self.menu_buttons):
+            btn.resize(self.expanded_width, self.btn_height)
+            btn.move(0, self.start_y + (i * self.btn_height))
+            btn.setVisible(False)
+            
+            style = self.menu_style
+            
+            if i == 0:
+                style += "QPushButton { border-top-right-radius: 12px; }"
+
+            elif i == len(self.menu_buttons) - 1:
+                style += "QPushButton { border-bottom-right-radius: 12px; border-bottom: none; }"
+                
+            btn.setStyleSheet(style)
+
+    def toggle_menu(self):
+        if not self.is_expanded:
+            self.resize(self.expanded_width, SCREEN_HEIGHT)
+            self.btn_toggle.setVisible(False)
+            for btn in self.menu_buttons:
+                btn.setVisible(True)
+            self.is_expanded = True
+        else:
+            self.collapse_menu()
+
+    def collapse_menu(self):
+        for btn in self.menu_buttons:
+            btn.setVisible(False)
+        self.btn_toggle.setVisible(True)
+        self.resize(self.collapsed_width, SCREEN_HEIGHT)
+        self.is_expanded = False
+
+    def select_mode(self, mode_name):
+        self.change_mode(mode_name)
+        self.collapse_menu()
+
+    def mousePressEvent(self, event):
+        if self.is_expanded:
+            if not (0 <= event.x() <= self.expanded_width and self.start_y <= event.y() <= self.start_y + self.menu_height):
+                self.collapse_menu()
+        super().mousePressEvent(event)
 
 
 class Win(QWidget):
@@ -59,9 +160,6 @@ class Win(QWidget):
         self.q_status = q_status
         self.current_mode = "CLEAR"
         self.yolo_ready = False
-        
-        self.last_time = time.time()
-        self.fps = 0.0
         
         self.setFixedSize(SCREEN_WIDTH, SCREEN_HEIGHT)
         layout = QGridLayout(self)
@@ -119,21 +217,6 @@ class Win(QWidget):
         except queue.Empty:
             pass
 
-    def toggle_zoom(self):
-        with self.lock:
-            current_zoom = self.buffer_container.get('zoom_factor', 1.0)
-            
-            if current_zoom == 1.0:
-                new_zoom = 2.0
-            elif current_zoom == 2.0:
-                new_zoom = 4.0
-            else:
-                new_zoom = 1.0
-                
-            self.buffer_container['zoom_factor'] = new_zoom
-            self.ui_overlay.btn_zoom.setText(f"zoom: {new_zoom:.1f}x")
-            print(f"zoom set to: {new_zoom:.1f}x")
-
     def handle_mode_change(self, mode_name):
         if not self.yolo_ready and mode_name != "LOADING":
             return
@@ -141,6 +224,8 @@ class Win(QWidget):
         if mode_name == "CLEAR":
             self.mode_overlay.setCurrentIndex(0)      
             self.current_mode = "CLEAR"
+            self.boxes_overlay.set_results([])
+
             with self.lock:
                 self.buffer_container['yolo_enabled'] = False
                 
@@ -151,12 +236,6 @@ class Win(QWidget):
                 self.buffer_container['yolo_enabled'] = True
 
     def update_ui(self):
-        current_time = time.time()
-        delta = current_time - self.last_time
-        if delta > 0:
-            self.fps = 1.0 / delta
-        self.last_time = current_time
-
         boxes = self.boxes_overlay.boxes
         if self.current_mode == "YOLO":
             while True:
@@ -166,23 +245,18 @@ class Win(QWidget):
                     break
             self.boxes_overlay.set_results(boxes)
         else:
-            self.boxes_overlay.set_results([])
+            # self.boxes_overlay.set_results([])
             while True:
                 try: self.q_out.get_nowait()
                 except queue.Empty: break
 
         with self.lock: 
             f = self.buffer_container.get('frame', None)
-        if f is None: return
+            if f is None: 
+                return
 
-        qimg = QImage(f.data, SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH * 3, QImage.Format_RGB888)
+        qimg = QImage(f.data, SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH * 3, QImage.Format_RGB888).copy()
         
-        painter = QPainter(qimg)
-        painter.setPen(QColor(0, 255, 0))
-        painter.setFont(QFont("Arial", 16, QFont.Bold))
-        painter.drawText(SCREEN_WIDTH - 120, 30, f"FPS: {self.fps:.1f}")
-        painter.end()
-
         pm = QPixmap.fromImage(qimg)
         self.video_label.setPixmap(pm)
 
