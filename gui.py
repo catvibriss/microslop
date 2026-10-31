@@ -30,7 +30,7 @@ class UIoverlay(QWidget):
         self.setAttribute(Qt.WA_AlwaysStackOnTop, True)
 
         # setup ==
-        self.collapsed_width = 30
+        self.collapsed_width = 70
         self.expanded_width = 250
         self.is_expanded = False
 
@@ -38,7 +38,7 @@ class UIoverlay(QWidget):
 
         # toggle  ==
         self.btn_toggle = QPushButton("", self)
-        self.btn_toggle.resize(self.collapsed_width, 70)
+        self.btn_toggle.resize(self.collapsed_width, 150)
         self.btn_toggle.clicked.connect(self.toggle_menu)
         
         svg_path = "img/menu.svg"

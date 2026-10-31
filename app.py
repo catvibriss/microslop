@@ -37,8 +37,15 @@ def main():
 
     # window :d
     w = gui.Win(p, q_out, buffer_container, video_buffer_lock, q_status)
-    w.show()
-    
+
+    is_lunih = sys.platform.startswith("linux")
+    if is_lunih:
+        # rpi prod
+        w.showFullScreen()
+    else: 
+        # win tests
+        w.show()
+
     sys.exit(app.exec())
 
 if __name__ == '__main__':
