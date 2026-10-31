@@ -77,16 +77,25 @@ class UIoverlay(QWidget):
         self.menu_buttons = []
         # -- -- --
 
-        self.btn_cam = QPushButton("clear", self)
-        self.btn_cam.clicked.connect(lambda: self.select_mode("CLEAR"))
+        self.btn_clear = QPushButton("микроскоп", self)
+        self.btn_clear.clicked.connect(lambda: self.select_mode("CLEAR"))
         
-        self.btn_yolo = QPushButton("YOLO", self)
+        self.btn_camera = QPushButton("камера", self)
+        self.btn_camera.clicked.connect(lambda: self.select_mode("CAMERA"))
+
+        self.btn_yolo = QPushButton("поиск дефектов", self)
         self.btn_yolo.clicked.connect(lambda: self.select_mode("YOLO"))
 
-        self.btn_close = QPushButton("close", self)
+        self.btn_edu = QPushButton("обучение", self)
+        self.btn_edu.clicked.connect(lambda: self.select_mode("EDUCATION"))
+
+        self.btn_settings = QPushButton("настройки", self)
+        self.btn_settings.clicked.connect(lambda: self.select_mode("SETTINGS"))
+
+        self.btn_close = QPushButton("выход", self)
         self.btn_close.clicked.connect(main_window.close)
 
-        self.menu_buttons = [self.btn_cam, self.btn_yolo, self.btn_close]
+        self.menu_buttons = [self.btn_clear, self.btn_camera, self.btn_yolo, self.btn_edu, self.btn_settings, self.btn_close]
         # -- -- --
 
         self.menu_height = len(self.menu_buttons) * self.btn_height
