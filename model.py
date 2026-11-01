@@ -1,15 +1,20 @@
 import sys
 from pathlib import Path
-from ultralytics import YOLO
+
+import numpy as np
+
 from PySide6.QtWidgets import QWidget
 from PySide6.QtGui import QPainter, QPen, QColor
 from PySide6.QtCore import Qt, QRectF
-from config import SCALE_X, SCALE_Y
+
+from config import *
 
 import time #[p]
 from _perf import perf #[p]
 
 def worker(q_in, q_out, q_status):
+    from ultralytics import YOLO
+
     t_boot = time.perf_counter() #[p]
     perf.tag = 'yolo' #[p]
 
@@ -19,8 +24,22 @@ def worker(q_in, q_out, q_status):
         target_device = "cpu"
 
         m = YOLO(str(model_path))
+
+        # prewarm
+        print("[yolo] prewarm: start")
+        _f_fake = np.zeros((SCREEN_HEIGHT, SCREEN_WIDTH, 3), dtype=np.uint8)
+
+        for i in range(3):
+            
+            t_warm = time.perf_counter() #[p]
+
+            m.predict(_f_fake, verbose=False, device=target_device, imgsz=320)
+            print(f"[yolo] prewarm: predict #{i} {(time.perf_counter() - t_warm)*1000:.0f} ms") #[p]
+
+
         q_status.put("READY")
         print(f"[yolo] start -> READY: {time.perf_counter() - t_boot:.2f} s", flush=True) #[p]
+
     except Exception as e:
         q_status.put(f"[yolo] startup error: {e}")
         return
@@ -45,7 +64,7 @@ def worker(q_in, q_out, q_status):
             perf.count('infer_done')
             perf.report_if_due()
             #[p]
-            
+
             r = results[0]
 
             out = []
