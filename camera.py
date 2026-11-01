@@ -23,7 +23,7 @@ def start_rpicam():
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=log_file, stdin=subprocess.DEVNULL)
     return proc, log_file
 
-def cam_loop(q_in, buffer_container, video_buffer_lock):
+def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
     use_rpicam = sys.platform.startswith('linux')
 
     frame_idx = 0
@@ -47,7 +47,7 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
         print(f"[camera] openCV. res: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
 
     try:
-        while True:
+        while not stop_event.is_set():
             yolo_active = buffer_container.get('yolo_enabled', False)
 
             if use_rpicam:
@@ -106,7 +106,8 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
                 proc.wait(timeout=1.0)
             except subprocess.TimeoutExpired:
                 proc.kill()
-
+            log_file.close()
+            
         else: 
             cap.release()
         

@@ -12,14 +12,6 @@ import time #[p]
 from _perf import perf #[p]
 
 def worker(q_in, q_out, q_status):
-    # threads and cores
-    import os
-    os.environ["OMP_NUM_THREADS"] = "3"
-    os.environ["MKL_NUM_THREADS"] = "3"
-    os.environ["OPENBLAS_NUM_THREADS"] = "3"
-    os.environ["VECLIB_MAXIMUM_THREADS"] = "3"
-    os.environ["NUMEXPR_NUM_THREADS"] = "3"
-    
     from ultralytics import YOLO
 
     t_boot = time.perf_counter() #[p]

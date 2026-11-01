@@ -9,10 +9,11 @@ import multiprocessing as mp
 from PySide6.QtWidgets import QApplication
 
 import model
-import camera
-import gui
 
 def main():
+    import camera
+    import gui
+
     mp.freeze_support()
     mp.set_start_method('spawn', force=True)
     
@@ -23,6 +24,7 @@ def main():
 
     buffer_container = {
         'frame': None,
+        'frame_idx': None,
         'yolo_enabled': False
     }
 
@@ -33,10 +35,12 @@ def main():
     p.start()
 
     # camera thread
-    threading.Thread(target=camera.cam_loop, args=(q_in, buffer_container, video_buffer_lock), daemon=True).start()
+    cam_stop = threading.Event()
+    cam_thread = threading.Thread(target=camera.cam_loop, args=(q_in, buffer_container, video_buffer_lock, cam_stop), daemon=True)
+    cam_thread.start()
 
     # window :d
-    w = gui.Win(p, q_out, buffer_container, video_buffer_lock, q_status)
+    w = gui.Win(p, q_in, q_out, buffer_container, video_buffer_lock, q_status, cam_stop, cam_thread)
 
     is_lunih = sys.platform.startswith("linux")
     if is_lunih:

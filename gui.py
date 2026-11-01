@@ -161,12 +161,16 @@ class UIoverlay(QWidget):
 
 
 class Win(QWidget):
-    def __init__(self, proc, q_out, buffer_container, video_buffer_lock, q_status):
+    def __init__(self, proc, q_in, q_out, buffer_container, video_buffer_lock, q_status, cam_stop, cam_thread):
         super().__init__()
         self.proc = proc  
+        self.q_in = q_in
         self.q_out = q_out
         self.buffer_container = buffer_container
         self.lock = video_buffer_lock
+
+        self.cam_stop = cam_stop
+        self.cam_thread = cam_thread
 
         self.q_status = q_status
         self.current_mode = "CLEAR"
@@ -226,7 +230,7 @@ class Win(QWidget):
                 self.yolo_ready_timer.stop()
 
                 self.ui_overlay.setVisible(True)
-                self.handle_mode_change("CLEAR")
+                self.handle_mode_change(modes.AppMode.CLEAR)
             else:
                 print(f"[GUI] error: {status}")
                 self.close()
@@ -281,15 +285,15 @@ class Win(QWidget):
     #[p]
 
     def _pt_update_ui(self, is_new_frame): #[p]
-        boxes = self.boxes_overlay.boxes
-
         if self.yolo_enabled:
+            new_boxes = None
             while True:
                 try:
-                    boxes = self.q_out.get_nowait()
+                    new_boxes = self.q_out.get_nowait()
                 except queue.Empty:
                     break
-            self.boxes_overlay.set_results(boxes)
+            if new_boxes is not None:
+                self.boxes_overlay.set_results(new_boxes)
         else:
             # self.boxes_overlay.set_results([])
             while True:
@@ -312,11 +316,14 @@ class Win(QWidget):
     def closeEvent(self, event):
         print("closing app...")
 
-        if hasattr(self, 't') and self.t.isActive():
-            self.t.stop()
-        if hasattr(self, 'yolo_ready_timer') and self.yolo_ready_timer.isActive():
-            self.yolo_ready_timer.stop()
-        
+        for t in (getattr(self, 't', None), getattr(self, 'yolo_ready_timer', None)):
+            if t is not None and t.isActive():
+                t.stop()
+
+        self.cam_stop.set()
+        if self.cam_thread.is_alive():
+            self.cam_thread.join(timeout=1.5)
+
         if self.proc and self.proc.is_alive():
             try:
                 print("terminating YOLO...")
@@ -326,14 +333,13 @@ class Win(QWidget):
                     self.proc.kill()
             except Exception as e:
                 print(f"[GUI] YOLO terminate err: {e}")
-        
-        for q in [self.q_out, self.q_status]:
-            if q:
-                try:
-                    q.close()
-                    q.join_thread()
-                except Exception:
-                    pass
-        
+
+        for q in (self.q_in, self.q_out, self.q_status):
+            try:
+                q.cancel_join_thread()
+                q.close()
+            except Exception:
+                pass
+
         print("app closed!")
         event.accept()
