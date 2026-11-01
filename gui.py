@@ -28,7 +28,7 @@ class UIoverlay(QWidget):
         self.expanded_width = 250
         self.is_expanded = False
 
-        self.resize(self.collapsed_width, SCREEN_HEIGHT)
+        self.toggle_y = (SCREEN_HEIGHT - 150) // 2
 
         # toggle  ==
         self.btn_toggle = QPushButton("", self)
@@ -64,7 +64,7 @@ class UIoverlay(QWidget):
             }}
         """)
 
-        self.btn_toggle.move(0, (SCREEN_HEIGHT - self.btn_toggle.height()) // 2)
+        self.btn_toggle.move(0, 0)
 
         # menu ==
         self.btn_height = 50
@@ -126,9 +126,14 @@ class UIoverlay(QWidget):
                 
             btn.setStyleSheet(style)
 
+        self._apply_collapsed()
+
+    def _apply_collapsed(self):
+        self.setGeometry(0, self.toggle_y, self.collapsed_width, self.btn_toggle.height())
+
     def toggle_menu(self):
         if not self.is_expanded:
-            self.resize(self.expanded_width, SCREEN_HEIGHT)
+            self.setGeometry(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
             self.btn_toggle.setVisible(False)
             for btn in self.menu_buttons:
                 btn.setVisible(True)
@@ -140,7 +145,8 @@ class UIoverlay(QWidget):
         for btn in self.menu_buttons:
             btn.setVisible(False)
         self.btn_toggle.setVisible(True)
-        self.resize(self.collapsed_width, SCREEN_HEIGHT)
+
+        self._apply_collapsed()
         self.is_expanded = False
 
     def select_mode(self, mode):
@@ -166,6 +172,8 @@ class Win(QWidget):
         self.current_mode = "CLEAR"
         self.yolo_ready = False
         
+        self.yolo_enabled = False
+        
         self.setFixedSize(SCREEN_WIDTH, SCREEN_HEIGHT)
         layout = QGridLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -190,13 +198,11 @@ class Win(QWidget):
             self.page_indices[mode_enum] = idx
 
         self.ui_overlay = UIoverlay(self, self.handle_mode_change)        
-        self.ui_overlay.setFixedSize(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.ui_overlay.setVisible(False)
 
         layout.addWidget(self.video_label, 0, 0)
         layout.addWidget(self.boxes_overlay, 0, 0)
         layout.addWidget(self.mode_overlay, 0, 0)
-        layout.addWidget(self.ui_overlay, 0, 0)
         
         self.boxes_overlay.raise_()
         self.mode_overlay.raise_()
@@ -253,6 +259,7 @@ class Win(QWidget):
 
         with self.lock:
             self.buffer_container['yolo_enabled'] = target_page.yolo_enabled
+            self.yolo_enabled = self.buffer_container['yolo_enabled']
 
     #[p]
     def update_ui(self):
@@ -276,10 +283,7 @@ class Win(QWidget):
     def _pt_update_ui(self, is_new_frame): #[p]
         boxes = self.boxes_overlay.boxes
 
-        current_page = self.mode_overlay.currentWidget()
-        is_yolo_active = getattr(current_page, 'yolo_enabled', False)
-        
-        if is_yolo_active:
+        if self.yolo_enabled:
             while True:
                 try:
                     boxes = self.q_out.get_nowait()
