@@ -215,7 +215,7 @@ class Win(QWidget):
         self.t = QTimer(self)
         self.t.timeout.connect(self.update_ui)
         self.t.start(33)  
-        print("4-layer sandwich ready with *ZOOM*")
+        print("4-layer sandwich ready withOUT zoom")
 
         self.yolo_ready_timer = QTimer(self)
         self.yolo_ready_timer.timeout.connect(self.check_yolo_status)

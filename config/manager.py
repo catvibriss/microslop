@@ -10,6 +10,8 @@ class YoloSettings(BaseModel):
     conf: float = 0.25
 
 class Settings(BaseModel):
+    basic_zoom: float = 6.0
+
     yolo: YoloSettings = Field(default_factory=YoloSettings)
 
     def save(self):
