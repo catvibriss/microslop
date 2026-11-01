@@ -12,6 +12,33 @@ import time #[p]
 from _perf import perf #[p]
 
 def worker(q_in, q_out, q_status):
+    
+    # YOLO speed эксперименты
+
+    import os
+    nice = int(os.environ.get("YOLO_NICE", "0"))
+    thr = int(os.environ.get("YOLO_THREADS", "0"))
+
+    if nice:
+        os.nice(nice)
+
+    if thr:
+        import onnxruntime as ort
+        _orig = ort.InferenceSession
+
+        class _Sess(_orig):
+            def __init__(self, path, sess_options=None, providers=None, **kw):
+                if sess_options is None:
+                    sess_options = ort.SessionOptions()
+                sess_options.intra_op_num_threads = thr
+                super().__init__(path, sess_options=sess_options, providers=providers, **kw)
+
+        ort.InferenceSession = _Sess
+
+    print(f"[yolo] tune: nice={nice} threads={thr}", flush=True)
+
+    # -- -- -- -- --
+    
     from ultralytics import YOLO
 
     t_boot = time.perf_counter() #[p]
