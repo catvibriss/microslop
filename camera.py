@@ -77,7 +77,9 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
                     perf.count('yolo_drop') #[p]
                 
                 else:
-                    f_yolo = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR_I420) if use_rpicam else f_bgr
+                    f_raw = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR_I420) if use_rpicam else f_bgr
+                    f_yolo = cv2.resize(f_raw, (320, 200), interpolation=cv2.INTER_LINEAR)
+                    
                     try:
                         q_in.put(f_yolo, block=False)
 
