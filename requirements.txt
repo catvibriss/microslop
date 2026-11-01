@@ -9,3 +9,5 @@ onnxruntime
 
 pyside6
 opencv-python
+
+pydantic

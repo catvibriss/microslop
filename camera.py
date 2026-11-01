@@ -4,7 +4,7 @@ import cv2
 import queue
 import subprocess
 import numpy as np
-from config import SCREEN_WIDTH, SCREEN_HEIGHT
+from config import SCREEN_WIDTH, SCREEN_HEIGHT, IS_LINUX
 
 import time #[p]
 from _perf import perf #[p]
@@ -24,15 +24,13 @@ def start_rpicam():
     return proc, log_file
 
 def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
-    use_rpicam = sys.platform.startswith('linux')
-
     frame_idx = 0
     log_file = None
     
     with video_buffer_lock:
         buffer_container['frame_idx'] = 0
     
-    if use_rpicam:
+    if IS_LINUX:
         proc, log_file = start_rpicam()
         frame_size = SCREEN_WIDTH * SCREEN_HEIGHT * 3 // 2
         print(f"[camera] rpicam-vid. res: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
@@ -50,7 +48,7 @@ def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
         while not stop_event.is_set():
             yolo_active = buffer_container.get('yolo_enabled', False)
 
-            if use_rpicam:
+            if IS_LINUX:
                 raw = proc.stdout.read(frame_size)
                 if len(raw) < frame_size:
                     print(f"rpicam-vid err: {proc.poll()}. check logs!")
@@ -77,7 +75,7 @@ def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
                     perf.count('yolo_drop') #[p]
                 
                 else:
-                    f_raw = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR_I420) if use_rpicam else f_bgr
+                    f_raw = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR_I420) if IS_LINUX else f_bgr
                     # f_yolo = cv2.resize(f_raw, (320, 200), interpolation=cv2.INTER_LINEAR)
 
                     try:
@@ -100,7 +98,7 @@ def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
             #[p]
 
     finally:
-        if use_rpicam: 
+        if IS_LINUX: 
             proc.terminate()
             try:
                 proc.wait(timeout=1.0)

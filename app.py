@@ -8,11 +8,13 @@ import threading
 import multiprocessing as mp
 from PySide6.QtWidgets import QApplication
 
-import model
-
 def main():
+    import config
+    config.IS_LINUX = sys.platform.startswith('linux')
+    
     import camera
     import gui
+    import model
 
     mp.freeze_support()
     mp.set_start_method('spawn', force=True)
@@ -42,8 +44,7 @@ def main():
     # window :d
     w = gui.Win(p, q_in, q_out, buffer_container, video_buffer_lock, q_status, cam_stop, cam_thread)
 
-    is_lunih = sys.platform.startswith("linux")
-    if is_lunih:
+    if config.IS_LINUX:
         # rpi prod
         w.showFullScreen()
     else: 
