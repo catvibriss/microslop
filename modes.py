@@ -4,6 +4,8 @@ from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QVBoxLayout
 from PySide6.QtGui import QFont
 from PySide6.QtCore import Qt
 
+from config import *
+
 class AppMode(Enum):
     CLEAR = auto()
     CAMERA = auto()
@@ -37,7 +39,7 @@ class YoloMode(ModeBasic):
         font = QFont("Arial", 16, QFont.Bold)
         label_style = "color: white; background-color: rgba(0, 0, 0, 150); padding: 5px; border-radius: 0px;"
 
-        self.model_info_label = QLabel("модель v6_960 • ONNX • 480x480", self)
+        self.model_info_label = QLabel(f"модель v6_960 • ONNX • {YOLO_IMGSZ}x{YOLO_IMGSZ}", self)
         self.model_info_label.setFont(font)
         self.model_info_label.setStyleSheet(label_style)
         self.model_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)

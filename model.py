@@ -59,7 +59,7 @@ def worker(q_in, q_out, q_status):
             
             t_warm = time.perf_counter() #[p]
 
-            m.predict(_f_fake, verbose=False, device=target_device, imgsz=480)
+            m.predict(_f_fake, verbose=False, device=target_device, imgsz=YOLO_IMGSZ)
             print(f"[yolo] prewarm: predict #{i} {(time.perf_counter() - t_warm)*1000:.0f} ms") #[p]
 
 
@@ -80,7 +80,7 @@ def worker(q_in, q_out, q_status):
 
             #[p]
             t = time.perf_counter()
-            results = m.predict(f, verbose=False, device=target_device, imgsz=480)
+            results = m.predict(f, verbose=False, device=target_device, imgsz=YOLO_IMGSZ)
             dt = time.perf_counter() - t
 
             n += 1
