@@ -12,6 +12,7 @@ import time #[p]
 from _perf import perf #[p]
 
 def worker(q_in, q_out, q_status):
+    print(f"\n[yolo] imgsz: {YOLO_IMGSZ}\n")
 
     # YOLO speed эксперименты
     if IS_LINUX:

@@ -2,6 +2,8 @@ import time
 import threading
 from collections import defaultdict
 
+from config import PERF_LOGGING
+
 class Perf:
     def __init__(self, interval=5.0, tag="perf"):
         self.interval = interval
@@ -41,7 +43,9 @@ class Perf:
             self._n.clear()
             self._max.clear()
             self._t0 = now
-        print(f"[{self.tag}] " + " | ".join(parts), flush=True)
+        
+        if PERF_LOGGING: 
+            print(f"[{self.tag}] " + " | ".join(parts), flush=True)
 
 
 perf = Perf()
