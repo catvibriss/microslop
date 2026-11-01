@@ -9,45 +9,31 @@ from config import SCREEN_WIDTH, SCREEN_HEIGHT
 import time #[p]
 from _perf import perf #[p]
 
-def update_hardware_zoom(proc, zoom_factor):
-    if proc is None or proc.poll() is not None:
-        return
-
-    if zoom_factor <= 1.0:
-        roi_str = "roi 0.0,0.0,1.0,1.0\n"
-    else:
-        size = 1.0 / zoom_factor
-        offset = (1.0 - size) / 2.0
-        roi_str = f"roi {offset:.4f},{offset:.4f},{size:.4f},{size:.4f}\n"
-    
-    try:
-        proc.stdin.write(roi_str.encode())
-        proc.stdin.flush()
-    except IOError:
-        pass
+def start_rpicam():
+    log_file = open("logs/rpicam.log", "wb")
+    cmd = [
+        'rpicam-vid', 
+        '--width', str(SCREEN_WIDTH), 
+        '--height', str(SCREEN_HEIGHT),
+        '--codec', 'yuv420', 
+        '--timeout', '0', 
+        '--nopreview', 
+        '-o', '-',     
+    ]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=log_file, stdin=subprocess.DEVNULL)
+    return proc, log_file
 
 def cam_loop(q_in, buffer_container, video_buffer_lock):
     use_rpicam = sys.platform.startswith('linux')
+
+    frame_idx = 0
+    log_file = None
     
     with video_buffer_lock:
-        buffer_container['zoom_factor'] = 1.0
         buffer_container['frame_idx'] = 0
     
-    if use_rpicam:        
-        cmd = [
-            'rpicam-vid', 
-            '--width', str(SCREEN_WIDTH), 
-            '--height', str(SCREEN_HEIGHT),
-            '--codec', 'yuv420', 
-            '--timeout', '0', 
-            '--nopreview', 
-            '--keypress', 
-            '-o', '-',     
-        ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-
-        update_hardware_zoom(proc, 1.0)
-
+    if use_rpicam:
+        proc, log_file = start_rpicam()
         frame_size = SCREEN_WIDTH * SCREEN_HEIGHT * 3 // 2
         print(f"[camera] rpicam-vid. res: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
 
@@ -60,24 +46,14 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
         proc = None
         print(f"[camera] openCV. res: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
 
-    last_zoom = 1.0
-
     try:
         while True:
-            with video_buffer_lock:
-                current_zoom = buffer_container.get('zoom_factor', 1.0)
-                yolo_active = buffer_container.get('yolo_enabled', False)
-                frame_idx = buffer_container.get('frame_idx', 0)
-            
-            if use_rpicam and current_zoom != last_zoom:
-                update_hardware_zoom(proc, current_zoom)
-                last_zoom = current_zoom
+            yolo_active = buffer_container.get('yolo_enabled', False)
 
             if use_rpicam:
                 raw = proc.stdout.read(frame_size)
                 if len(raw) < frame_size:
-                    err = proc.stderr.read().decode().strip()
-                    print(f"rpicam-vid err: {err}")
+                    print(f"rpicam-vid err: {proc.poll()}. check logs!")
                     break
 
                 t_work = time.perf_counter() #[p]
@@ -85,7 +61,6 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
                 yuv = np.frombuffer(raw, dtype=np.uint8).reshape((SCREEN_HEIGHT * 3 // 2, SCREEN_WIDTH))
                 
                 f_rgb = cv2.cvtColor(yuv, cv2.COLOR_YUV2RGB_I420)
-                f_yolo = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR_I420)
 
             else:
                 ok, f_bgr = cap.read()
@@ -95,23 +70,26 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
                 t_work = time.perf_counter() #[p]
                 
                 f_rgb = cv2.cvtColor(f_bgr, cv2.COLOR_BGR2RGB)     
-                f_yolo = f_bgr.copy()                          
 
             if yolo_active:
-                try: 
-                    q_in.put(f_yolo.copy(), block=False)
 
-                    perf.count('yolo_send') #[p]
-
-                except queue.Full: 
-
+                if q_in.full():
                     perf.count('yolo_drop') #[p]
+                
+                else:
+                    f_yolo = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR_I420) if use_rpicam else f_bgr
+                    try:
+                        q_in.put(f_yolo, block=False)
 
-                    pass
+                        perf.count('yolo_send') #[p]
 
+                    except queue.Full:
+                        perf.count('yolo_drop') #[p]
+
+            frame_idx += 1
             with video_buffer_lock:
-                buffer_container['frame'] = f_rgb.copy()
-                buffer_container['frame_idx'] = (frame_idx + 1) % 10000
+                buffer_container['frame'] = f_rgb
+                buffer_container['frame_idx'] = frame_idx
 
             #[p]
             perf.add('cam_work', time.perf_counter() - t_work)
@@ -122,6 +100,12 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
     finally:
         if use_rpicam: 
             proc.terminate()
+            try:
+                proc.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
         else: 
             cap.release()
+        
         print("camera stopped")
