@@ -59,7 +59,7 @@ def worker(q_in, q_out, q_status):
             
             t_warm = time.perf_counter() #[p]
 
-            m.predict(_f_fake, verbose=False, device=target_device, imgsz=320)
+            m.predict(_f_fake, verbose=False, device=target_device, imgsz=480)
             print(f"[yolo] prewarm: predict #{i} {(time.perf_counter() - t_warm)*1000:.0f} ms") #[p]
 
 
@@ -80,7 +80,7 @@ def worker(q_in, q_out, q_status):
 
             #[p]
             t = time.perf_counter()
-            results = m.predict(f, verbose=False, device=target_device, imgsz=320)
+            results = m.predict(f, verbose=False, device=target_device, imgsz=480)
             dt = time.perf_counter() - t
 
             n += 1
@@ -119,7 +119,7 @@ class BOXESoverlay(QWidget):
         }
 
         self.translatings = {
-            "excessive_solder": "много припойойой",
+            "excessive_solder": "много припойойойа",
             "solder_bridge": "мостик"
         }
 

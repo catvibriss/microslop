@@ -37,7 +37,7 @@ class YoloMode(ModeBasic):
         font = QFont("Arial", 16, QFont.Bold)
         label_style = "color: white; background-color: rgba(0, 0, 0, 150); padding: 5px; border-radius: 0px;"
 
-        self.model_info_label = QLabel("модель v6_960 • ONNX • 320x320", self)
+        self.model_info_label = QLabel("модель v6_960 • ONNX • 480x480", self)
         self.model_info_label.setFont(font)
         self.model_info_label.setStyleSheet(label_style)
         self.model_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
