@@ -10,6 +10,8 @@ from utils import make_colored_svg
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 import model
 
+from _perf import perf #[p]
+
 class ClearMode(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -250,7 +252,25 @@ class Win(QWidget):
             with self.lock:
                 self.buffer_container['yolo_enabled'] = True
 
+    #[p]
     def update_ui(self):
+        t = time.perf_counter()
+        prev = getattr(self, '_perf_prev', None)
+        if prev is not None:
+            perf.add('ui_tick_gap', t - prev)
+        self._perf_prev = t
+        with self.lock:
+            idx = self.buffer_container.get('frame_idx')
+        if idx != getattr(self, '_perf_idx', None):
+            perf.count('ui_new_frames')
+            self._perf_idx = idx
+        self._pt_update_ui()
+        perf.add('ui_work', time.perf_counter() - t)
+        perf.count('ui_ticks')
+        perf.report_if_due()
+    #[p]
+    
+    def _pt_update_ui(self): #[p]
         boxes = self.boxes_overlay.boxes
         if self.current_mode == "YOLO":
             while True:

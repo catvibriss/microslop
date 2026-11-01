@@ -6,25 +6,46 @@ from PySide6.QtGui import QPainter, QPen, QColor
 from PySide6.QtCore import Qt, QRectF
 from config import SCALE_X, SCALE_Y
 
+import time #[p]
+from _perf import perf #[p]
+
 def worker(q_in, q_out, q_status):
+    t_boot = time.perf_counter() #[p]
+    perf.tag = 'yolo' #[p]
+
     try:
         # model_path = Path("models") / "v6_960" / "best.pt"
         model_path = Path("models") / "v6_960" / "best.onnx"
         target_device = "cpu"
-        
+
         m = YOLO(str(model_path))
         q_status.put("READY")
+        print(f"[yolo] start -> READY: {time.perf_counter() - t_boot:.2f} s", flush=True) #[p]
     except Exception as e:
         q_status.put(f"[yolo] startup error: {e}")
         return
-    
+
+    n = 0  #[p]
+
     while True:
         try:
             f = q_in.get()
-            if f is None: 
+            if f is None:
                 break
-                
+
+            #[p]
+            t = time.perf_counter()
             results = m.predict(f, verbose=False, device=target_device, imgsz=320)
+            dt = time.perf_counter() - t
+
+            n += 1
+            if n <= 3:
+                print(f"[yolo] predict #{n}: {dt * 1000:.0f} ms", flush=True)
+            perf.add('infer', dt)
+            perf.count('infer_done')
+            perf.report_if_due()
+            #[p]
+            
             r = results[0]
 
             out = []
@@ -33,9 +54,9 @@ def worker(q_in, q_out, q_status):
                 cls_id = int(b.cls[0])
                 conf_val = float(b.conf[0])
                 out.append((x1, y1, x2, y2, r.names[cls_id], conf_val))
-            
+
             q_out.put(out)
-            
+
         except Exception:
             break
 

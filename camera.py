@@ -6,6 +6,9 @@ import subprocess
 import numpy as np
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 
+import time #[p]
+from _perf import perf #[p]
+
 def update_hardware_zoom(proc, zoom_factor):
     if proc is None or proc.poll() is not None:
         return
@@ -76,6 +79,8 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
                     err = proc.stderr.read().decode().strip()
                     print(f"rpicam-vid err: {err}")
                     break
+
+                t_work = time.perf_counter() #[p]
                 
                 yuv = np.frombuffer(raw, dtype=np.uint8).reshape((SCREEN_HEIGHT * 3 // 2, SCREEN_WIDTH))
                 
@@ -86,19 +91,33 @@ def cam_loop(q_in, buffer_container, video_buffer_lock):
                 ok, f_bgr = cap.read()
                 if not ok: 
                     break
-
+                
+                t_work = time.perf_counter() #[p]
+                
                 f_rgb = cv2.cvtColor(f_bgr, cv2.COLOR_BGR2RGB)     
                 f_yolo = f_bgr.copy()                          
 
             if yolo_active:
                 try: 
                     q_in.put(f_yolo.copy(), block=False)
+
+                    perf.count('yolo_send') #[p]
+
                 except queue.Full: 
+
+                    perf.count('yolo_drop') #[p]
+
                     pass
 
             with video_buffer_lock:
                 buffer_container['frame'] = f_rgb.copy()
                 buffer_container['frame_idx'] = (frame_idx + 1) % 10000
+
+            #[p]
+            perf.add('cam_work', time.perf_counter() - t_work)
+            perf.count('cam_frames')
+            perf.report_if_due()
+            #[p]
 
     finally:
         if use_rpicam: 
