@@ -113,11 +113,13 @@ class BOXESoverlay(QWidget):
         self.boxes = []  
         
         self.colors = {
-            "excessive_solder": QColor(241, 130, 41)
+            "excessive_solder": QColor(255, 127, 39),
+            "solder_bridge": QColor(237, 28, 36),
         }
 
         self.translatings = {
-            "excessive_solder": "много припойойой"
+            "excessive_solder": "много припойойой",
+            "solder_bridge": "мостик"
         }
 
     def set_results(self, boxes):
