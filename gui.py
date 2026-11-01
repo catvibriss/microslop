@@ -234,6 +234,13 @@ class Win(QWidget):
         except queue.Empty:
             pass
 
+    def _clear_q_out(self):
+        while True:
+            try:
+                self.q_out.get_nowait()
+            except queue.Empty:
+                break
+    
     def handle_mode_change(self, mode_name):
         if not self.yolo_ready and mode_name != "LOADING":
             return
@@ -241,7 +248,9 @@ class Win(QWidget):
         if mode_name == "CLEAR":
             self.mode_overlay.setCurrentIndex(0)      
             self.current_mode = "CLEAR"
+            
             self.boxes_overlay.set_results([])
+            self._clear_q_out()
 
             with self.lock:
                 self.buffer_container['yolo_enabled'] = False
@@ -269,7 +278,7 @@ class Win(QWidget):
         perf.count('ui_ticks')
         perf.report_if_due()
     #[p]
-    
+
     def _pt_update_ui(self): #[p]
         boxes = self.boxes_overlay.boxes
         if self.current_mode == "YOLO":
@@ -297,14 +306,29 @@ class Win(QWidget):
 
     def closeEvent(self, event):
         print("closing app...")
-        self.t.stop()
+
+        if hasattr(self, 't') and self.t.isActive():
+            self.t.stop()
+        if hasattr(self, 'yolo_ready_timer') and self.yolo_ready_timer.isActive():
+            self.yolo_ready_timer.stop()
         
         if self.proc and self.proc.is_alive():
             try:
+                print("terminating YOLO...")
                 self.proc.terminate()
                 self.proc.join(timeout=1.0)
-            except:
-                pass
+                if self.proc.is_alive():
+                    self.proc.kill()
+            except Exception as e:
+                print(f"[GUI] YOLO terminate err: {e}")
+        
+        for q in [self.q_out, self.q_status]:
+            if q:
+                try:
+                    q.close()
+                    q.join_thread()
+                except Exception:
+                    pass
         
         print("app closed!")
         event.accept()
