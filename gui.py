@@ -1,5 +1,6 @@
 import queue
 import time
+from enum import Enum, auto
 
 from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QPushButton, QApplication, QStackedWidget
 from PySide6.QtGui import QImage, QPixmap, QPainter, QColor, QFont
@@ -9,22 +10,9 @@ from utils import make_colored_svg
 
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 import model
+import modes
 
 from _perf import perf #[p]
-
-class ClearMode(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-
-class YoloMode(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        
-        self.btn_setting = QPushButton("play with me 0.0", self)
-        self.btn_setting.move(20, 120)
-        self.btn_setting.resize(160, 35)
 
 class UIoverlay(QWidget):
     def __init__(self, main_window, change_mode_callback):
@@ -84,19 +72,19 @@ class UIoverlay(QWidget):
         # -- -- --
 
         self.btn_clear = QPushButton("микроскоп", self)
-        self.btn_clear.clicked.connect(lambda: self.select_mode("CLEAR"))
+        self.btn_clear.clicked.connect(lambda: self.select_mode(modes.AppMode.CLEAR))
         
         self.btn_camera = QPushButton("камера", self)
-        self.btn_camera.clicked.connect(lambda: self.select_mode("CAMERA"))
+        self.btn_camera.clicked.connect(lambda: self.select_mode(modes.AppMode.CAMERA))
 
         self.btn_yolo = QPushButton("поиск дефектов", self)
-        self.btn_yolo.clicked.connect(lambda: self.select_mode("YOLO"))
+        self.btn_yolo.clicked.connect(lambda: self.select_mode(modes.AppMode.YOLO))
 
         self.btn_edu = QPushButton("обучение", self)
-        self.btn_edu.clicked.connect(lambda: self.select_mode("EDUCATION"))
+        self.btn_edu.clicked.connect(lambda: self.select_mode(modes.AppMode.EDUCATION))
 
         self.btn_settings = QPushButton("настройки", self)
-        self.btn_settings.clicked.connect(lambda: self.select_mode("SETTINGS"))
+        self.btn_settings.clicked.connect(lambda: self.select_mode(modes.AppMode.SETTINGS))
 
         self.btn_close = QPushButton("выход", self)
         self.btn_close.clicked.connect(main_window.close)
@@ -155,8 +143,8 @@ class UIoverlay(QWidget):
         self.resize(self.collapsed_width, SCREEN_HEIGHT)
         self.is_expanded = False
 
-    def select_mode(self, mode_name):
-        self.change_mode(mode_name)
+    def select_mode(self, mode):
+        self.change_mode(mode)
         self.collapse_menu()
 
     def mousePressEvent(self, event):
@@ -191,9 +179,15 @@ class Win(QWidget):
         self.mode_overlay = QStackedWidget(self)
         self.mode_overlay.setAttribute(Qt.WA_TranslucentBackground)
         self.mode_overlay.setFixedSize(SCREEN_WIDTH, SCREEN_HEIGHT)
-        
-        self.mode_overlay.addWidget(ClearMode()) 
-        self.mode_overlay.addWidget(YoloMode())
+
+        self.modes_pages = {}
+        self.page_indices = {}
+        for mode_enum, page_class in modes.MODES_CLASSES.items():
+            page_widget = page_class()
+            self.modes_pages[mode_enum] = page_widget
+
+            idx = self.mode_overlay.addWidget(page_widget)
+            self.page_indices[mode_enum] = idx
 
         self.ui_overlay = UIoverlay(self, self.handle_mode_change)        
         self.ui_overlay.setFixedSize(SCREEN_WIDTH, SCREEN_HEIGHT)
@@ -241,25 +235,24 @@ class Win(QWidget):
             except queue.Empty:
                 break
     
-    def handle_mode_change(self, mode_name):
-        if not self.yolo_ready and mode_name != "LOADING":
+    def handle_mode_change(self, mode_enum):
+        if not self.yolo_ready:
             return
 
-        if mode_name == "CLEAR":
-            self.mode_overlay.setCurrentIndex(0)      
-            self.current_mode = "CLEAR"
-            
-            self.boxes_overlay.set_results([])
-            self._clear_q_out()
+        target_idx = self.page_indices.get(mode_enum)
+        target_page = self.modes_pages.get(mode_enum)
+        
+        if target_idx is None or target_page is None:
+            return
 
-            with self.lock:
-                self.buffer_container['yolo_enabled'] = False
-                
-        elif mode_name == "YOLO":
-            self.mode_overlay.setCurrentIndex(1)
-            self.current_mode = "YOLO"
-            with self.lock:
-                self.buffer_container['yolo_enabled'] = True
+        self.boxes_overlay.set_results([])
+        self._clear_q_out()
+
+        self.mode_overlay.setCurrentIndex(target_idx)
+        self.current_mode = mode_enum
+
+        with self.lock:
+            self.buffer_container['yolo_enabled'] = target_page.yolo_enabled
 
     #[p]
     def update_ui(self):
@@ -269,19 +262,24 @@ class Win(QWidget):
             perf.add('ui_tick_gap', t - prev)
         self._perf_prev = t
         with self.lock:
-            idx = self.buffer_container.get('frame_idx')
-        if idx != getattr(self, '_perf_idx', None):
+            idx = self.buffer_container.get('frame_idx') 
+        is_new_frame = (idx != getattr(self, '_perf_idx', None))
+        if is_new_frame:
             perf.count('ui_new_frames')
-            self._perf_idx = idx
-        self._pt_update_ui()
+            self._perf_idx = idx 
+        self._pt_update_ui(is_new_frame)
         perf.add('ui_work', time.perf_counter() - t)
         perf.count('ui_ticks')
         perf.report_if_due()
     #[p]
 
-    def _pt_update_ui(self): #[p]
+    def _pt_update_ui(self, is_new_frame): #[p]
         boxes = self.boxes_overlay.boxes
-        if self.current_mode == "YOLO":
+
+        current_page = self.mode_overlay.currentWidget()
+        is_yolo_active = getattr(current_page, 'yolo_enabled', False)
+        
+        if is_yolo_active:
             while True:
                 try:
                     boxes = self.q_out.get_nowait()
@@ -293,6 +291,9 @@ class Win(QWidget):
             while True:
                 try: self.q_out.get_nowait()
                 except queue.Empty: break
+
+        if not is_new_frame:
+            return
 
         with self.lock: 
             f = self.buffer_container.get('frame', None)
