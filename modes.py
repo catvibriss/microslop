@@ -1,8 +1,8 @@
 from enum import Enum, auto
 
-from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QPushButton, QApplication, QStackedWidget
-from PySide6.QtGui import QImage, QPixmap, QPainter, QColor, QFont
-from PySide6.QtCore import QTimer, Qt, QSize
+from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QVBoxLayout
+from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt
 
 class AppMode(Enum):
     CLEAR = auto()
@@ -17,6 +17,7 @@ class ModeBasic(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.yolo_enabled = False    
 
+
 class ClearMode(ModeBasic):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -28,10 +29,31 @@ class YoloMode(ModeBasic):
         self.setAttribute(Qt.WA_TranslucentBackground)
 
         self.yolo_enabled = True
-        
-        self.btn_setting = QPushButton("play with me 0.0", self)
-        self.btn_setting.move(20, 120)
-        self.btn_setting.resize(160, 35)
+
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+
+        font = QFont("Arial", 16, QFont.Bold)
+        label_style = "color: white; background-color: rgba(0, 0, 0, 150); padding: 5px; border-radius: 0px;"
+
+        self.model_info_label = QLabel("модель v6_960 • ONNX • 320x320", self)
+        self.model_info_label.setFont(font)
+        self.model_info_label.setStyleSheet(label_style)
+        self.model_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.defect_counter_label = QLabel("всего дефектов: 0", self)
+        self.defect_counter_label.setFont(font)
+        self.defect_counter_label.setStyleSheet(label_style)
+        self.defect_counter_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.layout.addWidget(self.model_info_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.layout.addWidget(self.defect_counter_label, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        self.layout.addStretch(1)
+
+    def update_defect_count(self, count: int):
+        self.defect_counter_label.setText(f"всего дефектов: {count}")
 
 MODES_CLASSES = {
     AppMode.CLEAR: ClearMode,

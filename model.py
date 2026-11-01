@@ -108,6 +108,7 @@ def worker(q_in, q_out, q_status):
 class BOXESoverlay(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_AlwaysStackOnTop, True)
         self.boxes = []  
@@ -124,6 +125,11 @@ class BOXESoverlay(QWidget):
 
     def set_results(self, boxes):
         self.boxes = boxes
+
+        _page = self.parent().mode_overlay.currentWidget()
+        if _page and hasattr(_page, "update_defect_count"):
+            _page.update_defect_count(len(self.boxes))
+
         self.update() 
 
     def paintEvent(self, event):

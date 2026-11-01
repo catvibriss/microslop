@@ -1,6 +1,5 @@
 import queue
 import time
-from enum import Enum, auto
 
 from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QPushButton, QApplication, QStackedWidget
 from PySide6.QtGui import QImage, QPixmap, QPainter, QColor, QFont
