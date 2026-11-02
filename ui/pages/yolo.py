@@ -1,34 +1,14 @@
-from enum import Enum, auto
-
 from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QVBoxLayout
 from PySide6.QtGui import QFont
 from PySide6.QtCore import Qt
 
+from .base import ModeBasic
+
 from config import *
-
-class AppMode(Enum):
-    CLEAR = auto()
-    CAMERA = auto()
-    YOLO = auto()
-    EDUCATION = auto()
-    SETTINGS = auto()
-
-class ModeBasic(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.yolo_enabled = False    
-
-
-class ClearMode(ModeBasic):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAttribute(Qt.WA_TranslucentBackground)
 
 class YoloMode(ModeBasic):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAttribute(Qt.WA_TranslucentBackground)
 
         self.yolo_enabled = True
 
@@ -56,11 +36,3 @@ class YoloMode(ModeBasic):
 
     def update_defect_count(self, count: int):
         self.defect_counter_label.setText(f"всего дефектов: {count}")
-
-MODES_CLASSES = {
-    AppMode.CLEAR: ClearMode,
-    AppMode.CAMERA: ClearMode,
-    AppMode.YOLO: YoloMode,
-    AppMode.EDUCATION: ClearMode,
-    AppMode.SETTINGS: ClearMode
-}

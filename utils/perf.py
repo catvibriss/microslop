@@ -93,5 +93,4 @@ class Perf:
 
         print(f"[{self.tag}] " + " | ".join(parts), flush=True)
 
-
 perf = Perf()

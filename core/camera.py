@@ -1,5 +1,3 @@
-import sys
-import os
 import cv2
 import queue
 import subprocess
@@ -7,7 +5,7 @@ import numpy as np
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, IS_LINUX
 
 import time #[p]
-from _perf import perf #[p]
+from utils.perf import perf #[p]
 
 def start_rpicam():
     log_file = open("logs/rpicam.log", "wb")
@@ -23,12 +21,21 @@ def start_rpicam():
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=log_file, stdin=subprocess.DEVNULL)
     return proc, log_file
 
-def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
+def cam_loop(app_buffer):
+    # mreow
+    yolo_q_input = app_buffer.yolo_q_input
+
+    frame_state = app_buffer.frame_state
+    frame_lock = app_buffer.frame_lock
+
+    stop_event = app_buffer.camera_stop
+
+    # local
     frame_idx = 0
     log_file = None
     
-    with video_buffer_lock:
-        buffer_container['frame_idx'] = 0
+    with frame_lock:
+        frame_state['frame_idx'] = 0
     
     if IS_LINUX:
         proc, log_file = start_rpicam()
@@ -46,18 +53,21 @@ def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
 
     try:
         while not stop_event.is_set():
-            yolo_active = buffer_container.get('yolo_enabled', False)
+            yolo_active = frame_state.get('yolo_enabled', False)
 
+            # get GUI frame
             if IS_LINUX:
                 t_read = time.perf_counter() #[p]
+
                 raw = proc.stdout.read(frame_size)
+
                 perf.add('cam_read', time.perf_counter() - t_read) #[p]
+
                 if len(raw) < frame_size:
                     print(f"rpicam-vid err: {proc.poll()}. check logs!")
                     break
 
                 t_work = time.perf_counter() #[p]
-                
                 yuv = np.frombuffer(raw, dtype=np.uint8).reshape((SCREEN_HEIGHT * 3 // 2, SCREEN_WIDTH))
                 
                 t_convert = time.perf_counter() #[p]
@@ -72,14 +82,15 @@ def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
                     break
                 
                 t_work = time.perf_counter() #[p]
-                
                 t_convert = time.perf_counter() #[p]
+                
                 f_rgb = cv2.cvtColor(f_bgr, cv2.COLOR_BGR2RGB)
+                
                 perf.add('cam_rgb', time.perf_counter() - t_convert) #[p]     
 
+            # post converted YOLO frame
             if yolo_active:
-
-                if q_in.full():
+                if yolo_q_input.full():
                     perf.count('yolo_drop') #[p]
                 
                 else:
@@ -90,18 +101,17 @@ def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
 
                     try:
                         t_put = time.perf_counter() #[p]
-                        q_in.put(f_raw, block=False)
+                        yolo_q_input.put(f_raw, block=False)
                         perf.add('cam_queue_put', time.perf_counter() - t_put) #[p]
-
                         perf.count('yolo_send') #[p]
 
                     except queue.Full:
                         perf.count('yolo_drop') #[p]
 
             frame_idx += 1
-            with video_buffer_lock:
-                buffer_container['frame'] = f_rgb
-                buffer_container['frame_idx'] = frame_idx
+            with frame_lock:
+                frame_state['frame'] = f_rgb
+                frame_state['frame_idx'] = frame_idx
 
             #[p]
             perf.add('cam_work', time.perf_counter() - t_work)

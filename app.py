@@ -6,43 +6,37 @@ os.environ["QT_DEBUG_PLUGINS"] = "0"
 import sys
 import threading
 import multiprocessing as mp
+
 from PySide6.QtWidgets import QApplication
 
+import config
+
 def main():
-    import config
-    config.IS_LINUX = sys.platform.startswith('linux')
+    from core import camera, yolo_worker
+    from core.appbuffer import AppBuffer
     
-    import camera
-    import gui
-    import model
+    from ui import window
 
     mp.freeze_support()
     mp.set_start_method('spawn', force=True)
     
-    q_in  = mp.Queue(maxsize=1)
-    q_out = mp.Queue(maxsize=4)
-    q_status = mp.Queue(maxsize=1)
-    video_buffer_lock = mp.Lock()
-
-    buffer_container = {
-        'frame': None,
-        'frame_idx': None,
-        'yolo_enabled': False
-    }
+    app_buffer = AppBuffer()
 
     app = QApplication(sys.argv)
     
     # YOLO worker
-    p = mp.Process(target=model.worker, args=(q_in, q_out, q_status))
-    p.start()
+    app_buffer.model_process = mp.Process(
+        target=yolo_worker.worker,
+        args=(app_buffer.yolo_q_input, app_buffer.yolo_q_result, app_buffer.yolo_q_status),
+    )
+    app_buffer.model_process.start()
 
     # camera thread
-    cam_stop = threading.Event()
-    cam_thread = threading.Thread(target=camera.cam_loop, args=(q_in, buffer_container, video_buffer_lock, cam_stop), daemon=True)
-    cam_thread.start()
+    app_buffer.camera_thread = threading.Thread(target=camera.cam_loop, args=(app_buffer,), daemon=True)
+    app_buffer.camera_thread.start()
 
     # window :d
-    w = gui.Win(p, q_in, q_out, buffer_container, video_buffer_lock, q_status, cam_stop, cam_thread)
+    w = window.Win(app_buffer)
 
     if config.IS_LINUX:
         # rpi prod
