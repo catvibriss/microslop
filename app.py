@@ -27,7 +27,9 @@ def main():
     buffer_container = {
         'frame': None,
         'frame_idx': None,
-        'yolo_enabled': False
+        'yolo_enabled': False,
+        'zoom': config.ZOOM_MIN,
+        'zoom_applied': config.ZOOM_MIN
     }
 
     app = QApplication(sys.argv)
