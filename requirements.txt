@@ -11,3 +11,5 @@ pyside6
 opencv-python
 
 pydantic
+
+psutil

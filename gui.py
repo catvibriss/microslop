@@ -1,5 +1,6 @@
 import queue
 import time
+import os
 
 from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QPushButton, QApplication, QStackedWidget
 from PySide6.QtGui import QImage, QPixmap, QPainter, QColor, QFont
@@ -230,12 +231,27 @@ class Win(QWidget):
 
                 self.ui_overlay.setVisible(True)
                 self.handle_mode_change(modes.AppMode.CLEAR)
+                if os.environ.get('MICROSLOP_TEST_MODE'):
+                    QTimer.singleShot(3000, self._perf_test_begin)
             else:
                 print(f"[GUI] error: {status}")
                 self.close()
 
         except queue.Empty:
             pass
+
+    # Автотест запускается только при наличии переменной окружения.
+    def _perf_test_begin(self):
+        mode = os.environ.get('MICROSLOP_TEST_MODE', 'CLEAR').upper()
+        self.handle_mode_change(modes.AppMode.YOLO if mode == 'YOLO' else modes.AppMode.CLEAR)
+        print(f'[TEST START] mode={mode} imgsz={os.environ.get("MICROSLOP_TEST_IMGSZ", "default")} '
+              f'threads={os.environ.get("YOLO_THREADS", "default")}', flush=True)
+        duration = max(1, int(os.environ.get('MICROSLOP_TEST_SECONDS', '40')))
+        QTimer.singleShot(duration * 1000, self._perf_test_end)
+
+    def _perf_test_end(self):
+        print('[TEST END]', flush=True)
+        self.close()  # штатный closeEvent закрывает камеру и YOLO
 
     def _clear_q_out(self):
         while True:
@@ -284,6 +300,7 @@ class Win(QWidget):
     #[p]
 
     def _pt_update_ui(self, is_new_frame): #[p]
+        t_boxes = time.perf_counter() #[p]
         if self.yolo_enabled:
             new_boxes = None
             while True:
@@ -299,6 +316,8 @@ class Win(QWidget):
                 try: self.q_out.get_nowait()
                 except queue.Empty: break
 
+        perf.add('ui_boxes', time.perf_counter() - t_boxes) #[p]
+
         if not is_new_frame:
             return
 
@@ -307,10 +326,12 @@ class Win(QWidget):
             if f is None: 
                 return
 
+        t_render = time.perf_counter() #[p]
         qimg = QImage(f.data, SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH * 3, QImage.Format_RGB888).copy()
         
         pm = QPixmap.fromImage(qimg)
         self.video_label.setPixmap(pm)
+        perf.add('ui_render', time.perf_counter() - t_render) #[p]
 
     def closeEvent(self, event):
         print("closing app...")

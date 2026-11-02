@@ -75,7 +75,9 @@ def worker(q_in, q_out, q_status):
 
     while True:
         try:
+            t_wait = time.perf_counter() #[p]
             f = q_in.get()
+            perf.add('yolo_queue_wait', time.perf_counter() - t_wait) #[p]
             if f is None:
                 break
 
@@ -92,6 +94,7 @@ def worker(q_in, q_out, q_status):
             perf.report_if_due()
             #[p]
 
+            t_post = time.perf_counter() #[p]
             r = results[0]
 
             out = []
@@ -101,7 +104,10 @@ def worker(q_in, q_out, q_status):
                 conf_val = float(b.conf[0])
                 out.append((x1, y1, x2, y2, r.names[cls_id], conf_val))
 
+            perf.add('yolo_postprocess', time.perf_counter() - t_post) #[p]
+            t_put = time.perf_counter() #[p]
             q_out.put(out)
+            perf.add('yolo_result_put', time.perf_counter() - t_put) #[p]
 
         except Exception:
             break

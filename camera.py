@@ -49,7 +49,9 @@ def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
             yolo_active = buffer_container.get('yolo_enabled', False)
 
             if IS_LINUX:
+                t_read = time.perf_counter() #[p]
                 raw = proc.stdout.read(frame_size)
+                perf.add('cam_read', time.perf_counter() - t_read) #[p]
                 if len(raw) < frame_size:
                     print(f"rpicam-vid err: {proc.poll()}. check logs!")
                     break
@@ -58,16 +60,22 @@ def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
                 
                 yuv = np.frombuffer(raw, dtype=np.uint8).reshape((SCREEN_HEIGHT * 3 // 2, SCREEN_WIDTH))
                 
+                t_convert = time.perf_counter() #[p]
                 f_rgb = cv2.cvtColor(yuv, cv2.COLOR_YUV2RGB_I420)
+                perf.add('cam_rgb', time.perf_counter() - t_convert) #[p]
 
             else:
+                t_read = time.perf_counter() #[p]
                 ok, f_bgr = cap.read()
+                perf.add('cam_read', time.perf_counter() - t_read) #[p]
                 if not ok: 
                     break
                 
                 t_work = time.perf_counter() #[p]
                 
-                f_rgb = cv2.cvtColor(f_bgr, cv2.COLOR_BGR2RGB)     
+                t_convert = time.perf_counter() #[p]
+                f_rgb = cv2.cvtColor(f_bgr, cv2.COLOR_BGR2RGB)
+                perf.add('cam_rgb', time.perf_counter() - t_convert) #[p]     
 
             if yolo_active:
 
@@ -75,11 +83,15 @@ def cam_loop(q_in, buffer_container, video_buffer_lock, stop_event):
                     perf.count('yolo_drop') #[p]
                 
                 else:
+                    t_yolo = time.perf_counter() #[p]
                     f_raw = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR_I420) if IS_LINUX else f_bgr
+                    perf.add('cam_bgr', time.perf_counter() - t_yolo) #[p]
                     # f_yolo = cv2.resize(f_raw, (320, 200), interpolation=cv2.INTER_LINEAR)
 
                     try:
+                        t_put = time.perf_counter() #[p]
                         q_in.put(f_raw, block=False)
+                        perf.add('cam_queue_put', time.perf_counter() - t_put) #[p]
 
                         perf.count('yolo_send') #[p]
 
