@@ -43,11 +43,14 @@ def main():
     if config.IS_LINUX:
         # rpi prod
         w.showFullScreen()
-    else: 
+    else:
         # win tests
         w.show()
 
-    sys.exit(app.exec())
+    exit_code = app.exec()
+    if w.restart_requested:
+        os.execv(sys.executable, [sys.executable, *sys.argv])
+    sys.exit(exit_code)
 
 if __name__ == '__main__':
     import signal

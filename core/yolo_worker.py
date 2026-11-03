@@ -132,7 +132,7 @@ def worker(yolo_q_input, yolo_q_result, yolo_q_status, analysis_q_input, analysi
             #[p]
             t = time.perf_counter()
 
-            results = m.predict(f, verbose=False, device=target_device, imgsz=YOLO_IMGSZ)
+            results = m.predict(f, verbose=False, device=target_device, imgsz=YOLO_IMGSZ, conf=SETTINGS.yolo.conf)
 
             dt = time.perf_counter() - t
 

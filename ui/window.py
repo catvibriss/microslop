@@ -8,11 +8,12 @@ from PySide6.QtCore import QTimer, Qt
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 
 from ui import pages
+from ui.pages.yolo import AnalysisController
+from ui.pages.settings import SettingsPanel
+
 from ui.overlays.ui_palace import UIoverlay
 from ui.overlays.boxes import BOXESoverlay
 from ui.overlays.popup import POPUPoverlay
-
-from ui.pages.yolo import AnalysisController
 
 import time #[p]
 from utils.perf import perf #[p]
@@ -24,6 +25,7 @@ class Win(QWidget):
         # app basics
         self.app_buffer = app_buffer
         self.current_mode = None
+        self.restart_requested = False
 
         # YOLO flags
         self.yolo_ready = False
@@ -76,6 +78,10 @@ class Win(QWidget):
         self.analysis_controller.result_shown.connect(self._analysis_result_shown)
         self.analysis_controller.finished.connect(self._analysis_finished)
         self.popup_overlay.raise_()
+
+        # settings
+        self.settings_panel = SettingsPanel(self.popup_overlay)
+        self.settings_panel.restart_requested.connect(self._restart_from_settings)
 
         # timers
         self.t = QTimer(self)
@@ -133,6 +139,10 @@ class Win(QWidget):
         if not self.yolo_ready or self.analysis_controller.state != 'idle':
             return
 
+        if mode_enum == pages.AppMode.SETTINGS:
+            self.settings_panel.open()
+            return
+
         target_idx = self.page_indices.get(mode_enum)
         target_page = self.modes_pages.get(mode_enum)
         
@@ -148,6 +158,11 @@ class Win(QWidget):
         with self.app_buffer.frame_lock:
             self.app_buffer.frame_state['yolo_enabled'] = target_page.yolo_enabled
             self.yolo_enabled = self.app_buffer.frame_state['yolo_enabled']
+
+    # settings
+    def _restart_from_settings(self):
+        self.restart_requested = True
+        self.close()
 
     # zone analysis
     def _analysis_started(self):
