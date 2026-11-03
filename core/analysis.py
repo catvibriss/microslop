@@ -7,7 +7,7 @@ def iou(a, b):
     union = aa + ab - intersection
     return intersection / union if union > 0 else 0.0
 
-def merge_passes(passes, match_iou=0.45, nms_iou=0.45, min_votes=2):
+def merge_passes(passes, match_iou=0.45, nms_iou=0.45, min_votes=2, cross_class_iou=0.55):
     clusters = []
     for pass_index, detections in enumerate(passes):
         for box in sorted(detections, key=lambda b: float(b[5]), reverse=True):
@@ -39,9 +39,7 @@ def merge_passes(passes, match_iou=0.45, nms_iou=0.45, min_votes=2):
         boxes = group['boxes']
         weights = [float(b[5]) for b in boxes]
         total = sum(weights)
-        coords = [sum(float(b[i]) * w for b, w in zip(boxes, weights)) / total
-                  for i in range(4)]
-
+        coords = [sum(float(b[i]) * w for b, w in zip(boxes, weights)) / total for i in range(4)]
         candidates.append((*coords, group['label'], sum(weights) / len(weights)))
 
     final = []
@@ -49,4 +47,10 @@ def merge_passes(passes, match_iou=0.45, nms_iou=0.45, min_votes=2):
         if not any(box[4] == chosen[4] and iou(box, chosen) >= nms_iou
                    for chosen in final):
             final.append(box)
-    return final
+
+    result = []
+    for box in final:
+        if not any(box[4] != chosen[4] and iou(box, chosen) >= cross_class_iou
+                   for chosen in result):
+            result.append(box)
+    return result
