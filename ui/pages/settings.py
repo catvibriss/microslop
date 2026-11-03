@@ -39,11 +39,6 @@ class SettingsPanel(QWidget):
         row.addWidget(self.yolo_conf)
         self.layout.addLayout(row)
 
-        hint = QLabel('Изменения модели применятся после перезапуска приложения.', self)
-        hint.setWordWrap(True)
-        hint.setStyleSheet('color: #666666; background: transparent;')
-        self.layout.addWidget(hint)
-
         # actions
         buttons = QHBoxLayout()
         self.cancel_button = QPushButton('Отмена', self)
