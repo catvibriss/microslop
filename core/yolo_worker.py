@@ -1,4 +1,5 @@
 from pathlib import Path
+import queue
 
 import numpy as np
 
@@ -7,7 +8,37 @@ from config import *
 import time #[p]
 from utils.perf import perf #[p]
 
-def worker(yolo_q_input, yolo_q_result, yolo_q_status):
+def _run_analysis(model, request, q_events, device):
+    from core.analysis import merge_passes
+    import cv2
+
+    request_id, frame = request
+    try:
+        passes = []
+
+        for index, alpha in enumerate((1.0, 0.95, 1.05)):
+            q_events.put((request_id, 'status', f'Анализирую кадр · проход {index + 1}/3'))
+            variant = frame if alpha == 1.0 else cv2.convertScaleAbs(frame, alpha=alpha)
+            results = model.predict(variant, verbose=False, device=device, imgsz=960)
+            boxes = []
+            r = results[0]
+            for b in r.boxes:
+                x1, y1, x2, y2 = b.xyxy[0].tolist()
+                cls_id = int(b.cls[0])
+                conf_val = float(b.conf[0])
+                boxes.append((x1, y1, x2, y2, r.names[cls_id], conf_val))
+            passes.append(boxes)
+
+        q_events.put((request_id, 'status', 'Проверяю достоверность'))
+        final = merge_passes(passes, match_iou=0.45, nms_iou=0.45, min_votes=2)
+        q_events.put((request_id, 'status', 'Готовлю отчёт'))
+        q_events.put((request_id, 'done', final))
+
+    except Exception as exc:
+        print(f'[yolo] analysis error: {exc}', flush=True)
+        q_events.put((request_id, 'error', str(exc)))
+
+def worker(yolo_q_input, yolo_q_result, yolo_q_status, analysis_q_input, analysis_q_events):
     print(f"\n[yolo] imgsz: {YOLO_IMGSZ}\n")
 
     # YOLO speed эксперименты
@@ -29,7 +60,7 @@ def worker(yolo_q_input, yolo_q_result, yolo_q_status):
                         sess_options = ort.SessionOptions()
                     sess_options.intra_op_num_threads = thr
                     super().__init__(path, sess_options=sess_options, providers=providers, **kw)
-
+            
             ort.InferenceSession = _Sess
 
         print(f"[yolo] tune: nice={nice} threads={thr}", flush=True)
@@ -70,12 +101,32 @@ def worker(yolo_q_input, yolo_q_result, yolo_q_status):
 
     while True:
         try:
+
+            try:
+                request = analysis_q_input.get_nowait()
+            except queue.Empty:
+                request = None
+            if request is not None:
+                _run_analysis(m, request, analysis_q_events, target_device)
+                continue
+
             t_wait = time.perf_counter() #[p]
-            f = yolo_q_input.get()
+            try:
+                f = yolo_q_input.get(timeout=0.1)
+            except queue.Empty:
+                continue
             perf.add('yolo_queue_wait', time.perf_counter() - t_wait) #[p]
 
             if f is None:
                 break
+
+            try:
+                request = analysis_q_input.get_nowait()
+            except queue.Empty:
+                request = None
+            if request is not None:
+                _run_analysis(m, request, analysis_q_events, target_device)
+                continue
 
             #[p]
             t = time.perf_counter()

@@ -23,12 +23,14 @@ def main():
     app_buffer = AppBuffer()
 
     app = QApplication(sys.argv)
-    
+
     # YOLO worker
     app_buffer.model_process = mp.Process(
         target=yolo_worker.worker,
-        args=(app_buffer.yolo_q_input, app_buffer.yolo_q_result, app_buffer.yolo_q_status),
+        args=(app_buffer.yolo_q_input, app_buffer.yolo_q_result, app_buffer.yolo_q_status,
+              app_buffer.analysis_q_input, app_buffer.analysis_q_events),
     )
+
     app_buffer.model_process.start()
 
     # camera thread

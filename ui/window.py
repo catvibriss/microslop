@@ -10,6 +10,9 @@ from config import SCREEN_WIDTH, SCREEN_HEIGHT
 from ui import pages
 from ui.overlays.ui_palace import UIoverlay
 from ui.overlays.boxes import BOXESoverlay
+from ui.overlays.popup import POPUPoverlay
+
+from ui.pages.yolo import AnalysisController
 
 import time #[p]
 from utils.perf import perf #[p]
@@ -64,6 +67,16 @@ class Win(QWidget):
         self.mode_overlay.raise_()
         self.ui_overlay.raise_()
 
+        # zone analysis
+        self.popup_overlay = POPUPoverlay(self)
+        self.analysis_controller = AnalysisController(
+            self.app_buffer, self.popup_overlay, self.modes_pages[pages.AppMode.YOLO], self
+        )
+        self.analysis_controller.started.connect(self._analysis_started)
+        self.analysis_controller.result_shown.connect(self._analysis_result_shown)
+        self.analysis_controller.finished.connect(self._analysis_finished)
+        self.popup_overlay.raise_()
+
         # timers
         self.t = QTimer(self)
         self.t.timeout.connect(self.update_ui)
@@ -117,7 +130,7 @@ class Win(QWidget):
                 break
     
     def handle_mode_change(self, mode_enum):
-        if not self.yolo_ready:
+        if not self.yolo_ready or self.analysis_controller.state != 'idle':
             return
 
         target_idx = self.page_indices.get(mode_enum)
@@ -136,6 +149,25 @@ class Win(QWidget):
             self.app_buffer.frame_state['yolo_enabled'] = target_page.yolo_enabled
             self.yolo_enabled = self.app_buffer.frame_state['yolo_enabled']
 
+    # zone analysis
+    def _analysis_started(self):
+        self.yolo_enabled = False
+        self.boxes_overlay.set_results([])
+
+    def _analysis_result_shown(self):
+        self.boxes_overlay.hide()
+        self.ui_overlay.hide()
+        self.popup_overlay.raise_()
+
+    def _analysis_finished(self):
+        self.boxes_overlay.show()
+        self.ui_overlay.setVisible(self.yolo_ready)
+        self.boxes_overlay.set_results([])
+        self._clear_q_out()
+        with self.app_buffer.frame_lock:
+            self.yolo_enabled = self.app_buffer.frame_state['yolo_enabled']
+        self.popup_overlay.raise_()
+
     #[p]
     def update_ui(self):
         t = time.perf_counter()
@@ -149,7 +181,8 @@ class Win(QWidget):
         if is_new_frame:
             perf.count('ui_new_frames')
             self._perf_idx = idx 
-        self._pt_update_ui(is_new_frame)
+        if self.analysis_controller.state != 'result':
+            self._pt_update_ui(is_new_frame)
         perf.add('ui_work', time.perf_counter() - t)
         perf.count('ui_ticks')
         perf.report_if_due()
@@ -192,6 +225,8 @@ class Win(QWidget):
     def closeEvent(self, event):
         print("closing app...")
 
+        self.analysis_controller.stop()
+
         for t in (getattr(self, 't', None), getattr(self, 'yolo_ready_timer', None)):
             if t is not None and t.isActive():
                 t.stop()
@@ -210,7 +245,8 @@ class Win(QWidget):
             except Exception as e:
                 print(f"[GUI] YOLO terminate err: {e}")
 
-        for q in (self.app_buffer.yolo_q_input, self.app_buffer.yolo_q_result, self.app_buffer.yolo_q_status):
+        for q in (self.app_buffer.yolo_q_input, self.app_buffer.yolo_q_result, self.app_buffer.yolo_q_status,
+                  self.app_buffer.analysis_q_input, self.app_buffer.analysis_q_events):
             try:
                 q.cancel_join_thread()
                 q.close()

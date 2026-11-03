@@ -6,6 +6,9 @@ class AppBuffer:
         self.yolo_q_input = mp.Queue(maxsize=1)
         self.yolo_q_result = mp.Queue(maxsize=4)
         self.yolo_q_status = mp.Queue(maxsize=1)
+        
+        self.analysis_q_input = mp.Queue(maxsize=1)
+        self.analysis_q_events = mp.Queue(maxsize=12)
 
         self.frame_lock = mp.Lock()
         self.frame_state = {
