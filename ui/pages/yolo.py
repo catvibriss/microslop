@@ -6,6 +6,7 @@ from PySide6.QtGui import QFont, QPainter, QPen, QColor, QImage
 from PySide6.QtCore import Qt, QRectF, Signal, QTimer, QObject
 
 from .base import ModeBasic
+from ui.overlays.boxes import BOXESoverlay
 
 from config import *
 
@@ -46,6 +47,7 @@ class YoloMode(ModeBasic):
         
         self.analysis_button.setStyleSheet(f"""
             QPushButton {{
+                color: white;
                 background-color: rgba(255, 255, 255, 100);
                 
                 border: 3px solid #D4D4D4;
@@ -87,6 +89,7 @@ class AnalysisResultView(QWidget):
 
         self.close_button.setStyleSheet(f"""
             QPushButton {{
+                color: white;
                 background-color: rgba(255, 255, 255, 100);
                 
                 border: 3px solid #D4D4D4;
@@ -120,24 +123,10 @@ class AnalysisResultView(QWidget):
             p.end()
             return
         p.drawImage(self.rect(), self.image)
-        p.setRenderHint(QPainter.Antialiasing)
+
         sx = self.width() / self.image.width()
         sy = self.height() / self.image.height()
-        names = {'excessive_solder': 'много припоя', 'solder_bridge': 'мостик'}
-        colors = {'excessive_solder': QColor(255, 127, 39),
-                  'solder_bridge': QColor(237, 28, 36)}
-        for x1, y1, x2, y2, name, conf in self.boxes:
-            color = colors.get(name, QColor(255, 50, 60))
-            rx, ry = x1 * sx, y1 * sy
-            rw, rh = (x2 - x1) * sx, (y2 - y1) * sy
-            p.setFont(QFont('Arial', 11, QFont.Bold))
-            caption = f'{names.get(name, name)}  {conf:.2f}'
-            rect = QRectF(rx, max(0, ry - 29), max(rw, p.fontMetrics().horizontalAdvance(caption) + 20), 29)
-            p.fillRect(rect, color)
-            p.setPen(QColor(255, 255, 255))
-            p.drawText(rect.adjusted(8, 0, -8, 0), Qt.AlignVCenter | Qt.AlignLeft, caption)
-            p.setPen(QPen(color, 3))
-            p.drawRect(QRectF(rx, ry, rw, rh))
+        BOXESoverlay.draw_boxes(p, self.boxes, sx, sy)
         p.end()
 
 class AnalysisController(QObject):
@@ -154,10 +143,6 @@ class AnalysisController(QObject):
         self.state = 'idle'
         self.frame = None
         self.request_id = 0
-        self.count = 0
-
-        self.countdown_timer = QTimer(self)
-        self.countdown_timer.timeout.connect(self._countdown_tick)
 
         self.poll_timer = QTimer(self)
         self.poll_timer.timeout.connect(self._poll)
@@ -182,25 +167,16 @@ class AnalysisController(QObject):
     def start(self):
         if self.state != 'idle' or not self.page.isVisible():
             return
-        self.state = 'countdown'
+        self.state = 'processing'
         self.page.analysis_button.setEnabled(False)
         self._set_live(False)
         self.started.emit()
-        self.count = 0
-        self.popup_overlay.show_status(f'Анализ зоны\nСнимок через {self.count}...')
-        self.countdown_timer.start(1000)
+        self.popup_overlay.show_status('Делаю снимок')
+        QTimer.singleShot(0, self._capture)
 
-    def _countdown_tick(self):
-        if self.state != 'countdown':
-            self.countdown_timer.stop()
+    def _capture(self):
+        if self.state != 'processing':
             return
-        self.count -= 1
-        if self.count > 0:
-            self.popup_overlay.set_status(f'Анализ зоны\nСнимок через {self.count}...')
-            return
-
-        self.countdown_timer.stop()
-        self.popup_overlay.set_status('Делаю снимок')
         with self.app_buffer.frame_lock:
             frame = self.app_buffer.frame_state.get('frame')
             self.frame = frame.copy() if frame is not None else None
@@ -259,7 +235,6 @@ class AnalysisController(QObject):
         self.result_shown.emit()
 
     def _error(self, message):
-        self.countdown_timer.stop()
         self.state = 'idle'
         self.frame = None
         self.page.analysis_button.setEnabled(True)
@@ -280,7 +255,6 @@ class AnalysisController(QObject):
         self.finished.emit()
 
     def stop(self):
-        self.countdown_timer.stop()
         self.poll_timer.stop()
         self.page.hide_analysis_result()
         self.frame = None

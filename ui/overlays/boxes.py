@@ -4,6 +4,16 @@ from PySide6.QtCore import Qt, QRectF
 from config import *
 
 class BOXESoverlay(QWidget):
+    colors = {
+        "excessive_solder": QColor(255, 127, 39),
+        "solder_bridge": QColor(237, 28, 36),
+    }
+
+    translatings = {
+        "excessive_solder": "много припоя",
+        "solder_bridge": "мостик"
+    }
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -11,16 +21,6 @@ class BOXESoverlay(QWidget):
         self.setAttribute(Qt.WA_AlwaysStackOnTop, True)
         self.boxes = []  
         
-        self.colors = {
-            "excessive_solder": QColor(255, 127, 39),
-            "solder_bridge": QColor(237, 28, 36),
-        }
-
-        self.translatings = {
-            "excessive_solder": "много припойойойа",
-            "solder_bridge": "мостик"
-        }
-
     def set_results(self, boxes):
         self.boxes = boxes
 
@@ -35,18 +35,24 @@ class BOXESoverlay(QWidget):
             return
         
         p = QPainter(self)
+        self.draw_boxes(p, self.boxes, SCALE_X, SCALE_Y)
+
+        p.end()
+
+    @staticmethod
+    def draw_boxes(p, boxes, scale_x, scale_y):
         p.setRenderHint(QPainter.Antialiasing)
         p.setRenderHint(QPainter.TextAntialiasing)
         
-        for x1, y1, x2, y2, name, cf in self.boxes:
+        for x1, y1, x2, y2, name, cf in boxes:
             # main color
-            color = self.colors.get(name, QColor(255, 0, 0))
+            color = BOXESoverlay.colors.get(name, QColor(255, 0, 0))
 
             # cords
-            rx = x1 * SCALE_X
-            ry = y1 * SCALE_Y
-            rw = (x2 - x1) * SCALE_X
-            rh = (y2 - y1) * SCALE_Y
+            rx = x1 * scale_x
+            ry = y1 * scale_y
+            rw = (x2 - x1) * scale_x
+            rh = (y2 - y1) * scale_y
 
             # font
             font = p.font()
@@ -55,7 +61,7 @@ class BOXESoverlay(QWidget):
             p.setFont(font)
 
             # text
-            name_text = self.translatings.get(name, name)
+            name_text = BOXESoverlay.translatings.get(name, name)
             conf_text = f"{cf:.2f}"
 
             # size
@@ -87,5 +93,4 @@ class BOXESoverlay(QWidget):
             p.setPen(QPen(color, 2))
             p.setBrush(Qt.NoBrush)
             p.drawRect(QRectF(rx, ry, rw, rh))
-            
-        p.end()
+        
