@@ -60,6 +60,12 @@ class Win(QWidget):
             idx = self.mode_overlay.addWidget(page_widget)
             self.page_indices[mode_enum] = idx
 
+        # camera
+        camera_page = self.modes_pages[pages.AppMode.CAMERA]
+        camera_page.set_app_buffer(self.app_buffer)
+        camera_page.gallery_opened.connect(self.ui_overlay.hide)
+        camera_page.gallery_closed.connect(lambda: self.ui_overlay.setVisible(self.yolo_ready))
+
         # layout build
         layout.addWidget(self.video_label, 0, 0)
         layout.addWidget(self.boxes_overlay, 0, 0)
