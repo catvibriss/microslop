@@ -60,7 +60,7 @@ class UIoverlay(QWidget):
         self.btn_toggle.move(0, 0)
 
         # menu ==
-        self.btn_height = 50
+        self.btn_height = 70
         self.menu_buttons = []
         # -- -- --
 
@@ -99,6 +99,7 @@ class UIoverlay(QWidget):
                 font-weight: normal;
                 text-align: left;
                 padding-left: 20px;
+                font-size: 22px;
             }
             QPushButton:hover { background-color: rgb(240, 240, 240); }
             QPushButton:pressed { background-color: rgb(220, 220, 220); }
