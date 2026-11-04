@@ -85,6 +85,11 @@ class Win(QWidget):
         self.analysis_controller.finished.connect(self._analysis_finished)
         self.popup_overlay.raise_()
 
+        # education
+        education_page = self.modes_pages[pages.AppMode.EDUCATION]
+        education_page.set_popup(self.popup_overlay)
+        education_page.profile_selected.connect(lambda: self.handle_mode_change(pages.AppMode.EDUCATION))
+
         # settings
         self.settings_panel = SettingsPanel(self.popup_overlay)
         self.settings_panel.restart_requested.connect(self._restart_from_settings)
@@ -148,6 +153,12 @@ class Win(QWidget):
         if mode_enum == pages.AppMode.SETTINGS:
             self.settings_panel.open()
             return
+
+        if mode_enum == pages.AppMode.EDUCATION:
+            education_page = self.modes_pages[pages.AppMode.EDUCATION]
+            if education_page.active_student is None:
+                education_page.open_profile_picker()
+                return
 
         target_idx = self.page_indices.get(mode_enum)
         target_page = self.modes_pages.get(mode_enum)

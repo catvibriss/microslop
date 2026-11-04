@@ -14,12 +14,13 @@ from .base import ModeBasic
 # actual pages
 from .yolo import YoloMode
 from .camera import CameraMode
+from .education import EducationMode
 
 # result
 MODES_CLASSES = {
     AppMode.CLEAR: ModeBasic,
     AppMode.CAMERA: CameraMode,
     AppMode.YOLO: YoloMode,
-    AppMode.EDUCATION: ModeBasic,
+    AppMode.EDUCATION: EducationMode,
     AppMode.SETTINGS: ModeBasic
 }
