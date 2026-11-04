@@ -16,7 +16,7 @@ def _run_analysis(model, request, q_events, device):
     try:
         passes = []
 
-        alphas = (1.0, 0.95, 1.05, 0.90, 1.10, 0.85, 1.15)
+        alphas = (1.0, 0.95, 1.05, 0.85, 1.15)
         for index, alpha in enumerate(alphas):
             q_events.put((request_id, 'status', f'Анализирую кадр · проход {index + 1}/{len(alphas)}'))
             variant = frame if alpha == 1.0 else cv2.convertScaleAbs(frame, alpha=alpha)

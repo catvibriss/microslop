@@ -3,10 +3,14 @@ import cv2
 
 from PySide6.QtWidgets import QWidget, QLabel, QGridLayout, QVBoxLayout, QPushButton
 from PySide6.QtGui import QFont, QPainter, QPen, QColor, QImage
-from PySide6.QtCore import Qt, QRectF, Signal, QTimer, QObject
+from PySide6.QtCore import Qt, QRectF, Signal, QTimer, QObject, QSize
 
 from .base import ModeBasic
+
 from ui.overlays.boxes import BOXESoverlay
+from ui import icons
+
+from utils.graphical import make_colored_svg
 
 from config import *
 
@@ -84,8 +88,11 @@ class AnalysisResultView(QWidget):
         self.image = None
         self.boxes = []
 
-        self.close_button = QPushButton('✕', self)
+        self.close_button = QPushButton('', self)
         self.close_button.setGeometry(SCREEN_WIDTH - 90, 20, 65, 65)
+
+        self.close_button.setIcon(make_colored_svg(icons.CLOSE, Qt.white))
+        self.close_button.setIconSize(QSize(28, 28))
 
         self.close_button.setStyleSheet(f"""
             QPushButton {{

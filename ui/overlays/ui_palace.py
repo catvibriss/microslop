@@ -5,7 +5,7 @@ from PySide6.QtCore import QTimer, Qt, QSize
 from utils.graphical import make_colored_svg 
 
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
-from ui import pages
+from ui import pages, icons
 
 class UIoverlay(QWidget):
     def __init__(self, main_window, change_mode_callback):
@@ -18,7 +18,7 @@ class UIoverlay(QWidget):
 
         # setup ==
         self.collapsed_width = 70
-        self.expanded_width = 250
+        self.expanded_width = 290
         self.is_expanded = False
 
         self.toggle_y = (SCREEN_HEIGHT - 150) // 2
@@ -28,7 +28,7 @@ class UIoverlay(QWidget):
         self.btn_toggle.resize(self.collapsed_width, 150)
         self.btn_toggle.clicked.connect(self.toggle_menu)
 
-        svg_path = "img/menu.svg"
+        svg_path = icons.MENU
         self.btn_toggle.setIcon(make_colored_svg(svg_path, Qt.white))
         self.btn_toggle.setIconSize(QSize(28, 28))
 
@@ -99,7 +99,7 @@ class UIoverlay(QWidget):
                 font-weight: normal;
                 text-align: left;
                 padding-left: 20px;
-                font-size: 22px;
+                font-size: 20px;
             }
             QPushButton:hover { background-color: rgb(240, 240, 240); }
             QPushButton:pressed { background-color: rgb(220, 220, 220); }

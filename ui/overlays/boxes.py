@@ -62,7 +62,7 @@ class BOXESoverlay(QWidget):
 
             # text
             name_text = BOXESoverlay.translatings.get(name, name)
-            conf_text = f"{cf:.2f}"
+            conf_text = f"{round(cf*100)}%"
 
             # size
             metrics = p.fontMetrics()

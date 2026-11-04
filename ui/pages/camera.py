@@ -6,7 +6,10 @@ from PySide6.QtGui import QFont, QImage, QPixmap, QImageReader, QIcon
 from PySide6.QtCore import Qt, Signal, QSize
 
 from .base import ModeBasic
+
 from utils.graphical import make_colored_svg
+from ui import icons
+
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, PHOTO_DIR
 
 class CameraMode(ModeBasic):
@@ -35,14 +38,14 @@ class CameraMode(ModeBasic):
         self.photo_button.setFixedSize(420, 74)
         self.photo_button.setFont(QFont('Arial', 20, QFont.Bold))
         self.photo_button.setLayoutDirection(Qt.RightToLeft)
-        self.photo_button.setIcon(make_colored_svg('img/menu.svg', Qt.white))
+        self.photo_button.setIcon(make_colored_svg(icons.CAMERA, Qt.white))
         self.photo_button.setIconSize(QSize(28, 28))
         self.photo_button.setStyleSheet(self._button_style())
         self.photo_button.clicked.connect(self.take_photo)
 
         self.gallery_button = QPushButton('', self)
         self.gallery_button.setFixedSize(74, 74)
-        self.gallery_button.setIcon(make_colored_svg('img/menu.svg', Qt.white))
+        self.gallery_button.setIcon(make_colored_svg(icons.IMAGE, Qt.white))
         self.gallery_button.setIconSize(QSize(28, 28))
         self.gallery_button.setStyleSheet(self._button_style())
         self.gallery_button.clicked.connect(self.open_gallery)
@@ -133,7 +136,7 @@ class PhotoGallery(QWidget):
 
         self.close_button = QPushButton('', self)
         self.close_button.setFixedSize(65, 55)
-        self.close_button.setIcon(make_colored_svg('img/menu.svg', Qt.black))
+        self.close_button.setIcon(make_colored_svg(icons.CLOSE, Qt.black))
         self.close_button.setIconSize(QSize(28, 28))
         self.close_button.setStyleSheet(self._button_style())
         self.close_button.clicked.connect(self.close_gallery)
