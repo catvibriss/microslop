@@ -27,6 +27,8 @@ class BOXESoverlay(QWidget):
         _page = self.parent().mode_overlay.currentWidget()
         if _page and hasattr(_page, "update_defect_count"):
             _page.update_defect_count(len(self.boxes))
+        if _page and hasattr(_page, "set_boxes"):
+            _page.set_boxes(self.boxes)
 
         self.update() 
 

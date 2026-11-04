@@ -3,11 +3,14 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, Signal, QRectF, QSize
+from PySide6.QtGui import QFont, QPainter, QPainterPath, QColor
 from PySide6.QtWidgets import QWidget, QLabel, QPushButton, QLineEdit, QVBoxLayout, QHBoxLayout, QScrollArea, QStackedWidget
 
 from .base import ModeBasic
+from utils.graphical import make_colored_svg
+from ui import icons
+from config import SCALE_X, SCALE_Y
 
 STUDENTS_DIR = Path(__file__).resolve().parents[2] / 'students'
 
@@ -18,17 +21,11 @@ class EducationMode(ModeBasic):
         super().__init__(parent)
         self.active_student = None
         self.profile_picker = None
+        self.handbook = None
+        self._boxes = []
+        self.yolo_enabled = True
 
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.layout.addStretch(1)
-
-        self.student_label = QLabel('', self)
-        self.student_label.setFont(QFont('Arial', 20, QFont.Bold))
-        self.student_label.setAlignment(Qt.AlignCenter)
-        self.student_label.setStyleSheet('color: white; background: rgba(0, 0, 0, 150);')
-        self.layout.addWidget(self.student_label)
-        self.layout.addStretch(1)
+        self.handbook = HandbookViewer(self)
 
     def set_popup(self, popup_overlay):
         self.profile_picker = StudentPicker(popup_overlay)
@@ -39,8 +36,109 @@ class EducationMode(ModeBasic):
 
     def _select_student(self, student):
         self.active_student = student
-        self.student_label.setText(f"ученик: {student['name']}")
         self.profile_selected.emit()
+
+    def set_boxes(self, boxes):
+        self._boxes = list(boxes)
+
+    def hideEvent(self, event):
+        self._boxes = []
+        self.handbook.close_viewer()
+        super().hideEvent(event)
+
+    def resizeEvent(self, event):
+        self.handbook.update_geometry()
+        super().resizeEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() != Qt.LeftButton or self.active_student is None or self.handbook is None:
+            return super().mousePressEvent(event)
+
+        point = event.position()
+        hits = []
+
+        for x1, y1, x2, y2, name, cf in self._boxes:
+            rect = QRectF(x1 * SCALE_X, y1 * SCALE_Y,
+                          (x2 - x1) * SCALE_X, (y2 - y1) * SCALE_Y)
+            if rect.contains(point):
+                hits.append((rect.width() * rect.height(), -cf, name))
+
+        if not hits:
+            return super().mousePressEvent(event)
+
+        _, _, name = min(hits)
+        self.handbook.open_article(name)
+        event.accept()
+
+class HandbookViewer(QWidget):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.panel_width = 460
+        self.corner_radius = 48
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setObjectName('handbookViewer')
+        self.setStyleSheet('''
+            QWidget#handbookViewer { background: transparent; border: none; }
+            QLabel { color: #1F2937; background: transparent; border: none; }
+        ''')
+
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(28, 22, 20, 20)
+
+        header = QHBoxLayout()
+        self.title = QLabel('справка(?)', self)
+        self.title.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        self.title.setFont(QFont('Arial', 20, QFont.Bold))
+        header.addWidget(self.title, 1)
+
+        self.close_button = QPushButton('', self)
+        self.close_button.setFixedSize(48, 46)
+        self.close_button.setIcon(make_colored_svg(icons.CLOSE, Qt.black))
+        self.close_button.setIconSize(QSize(24, 24))
+        self.close_button.setStyleSheet('''
+            QPushButton { background: #F3F4F6; border: none; border-radius: 12px; }
+            QPushButton:hover { background: #E5E7EB; }
+            QPushButton:pressed { background: #D1D5DB; }
+        ''')
+        self.close_button.clicked.connect(self.close_viewer)
+        header.addWidget(self.close_button)
+        self.layout.addLayout(header)
+        self.layout.addStretch(1)
+
+        self.update_geometry()
+        self.hide()
+
+    def paintEvent(self, event):
+        r = min(self.corner_radius, self.width() / 2, self.height() / 2)
+        w = self.width()
+        h = self.height()
+
+        path = QPainterPath()
+        path.moveTo(r, 0)
+        path.lineTo(w, 0)
+        path.lineTo(w, h)
+        path.lineTo(r, h)
+        path.quadTo(0, h, 0, h - r)
+        path.lineTo(0, r)
+        path.quadTo(0, 0, r, 0)
+        path.closeSubpath()
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.fillPath(path, QColor('#FFFFFF'))
+        painter.end()
+
+    def update_geometry(self):
+        self.setGeometry(self.parent().width() - self.panel_width, 0,
+                         self.panel_width, self.parent().height())
+
+    def open_article(self, name):
+        self.update_geometry()
+        self.show()
+        self.raise_()
+
+    def close_viewer(self):
+        self.hide()
 
 class StudentPicker(QWidget):
     selected = Signal(dict)

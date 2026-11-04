@@ -73,8 +73,8 @@ class UIoverlay(QWidget):
         self.btn_yolo = QPushButton("поиск дефектов", self)
         self.btn_yolo.clicked.connect(lambda: self.select_mode(pages.AppMode.YOLO))
 
-        self.btn_edu = QPushButton("обучение", self)
-        self.btn_edu.clicked.connect(lambda: self.select_mode(pages.AppMode.EDUCATION))
+        # self.btn_edu = QPushButton("обучение", self)
+        # self.btn_edu.clicked.connect(lambda: self.select_mode(pages.AppMode.EDUCATION))
 
         self.btn_settings = QPushButton("настройки", self)
         self.btn_settings.clicked.connect(lambda: self.select_mode(pages.AppMode.SETTINGS))
@@ -82,7 +82,7 @@ class UIoverlay(QWidget):
         self.btn_close = QPushButton("выход", self)
         self.btn_close.clicked.connect(main_window.close)
 
-        self.menu_buttons = [self.btn_clear, self.btn_camera, self.btn_yolo, self.btn_edu, self.btn_settings, self.btn_close]
+        self.menu_buttons = [self.btn_clear, self.btn_camera, self.btn_yolo, self.btn_settings, self.btn_close]
         # -- -- --
 
         self.menu_height = len(self.menu_buttons) * self.btn_height

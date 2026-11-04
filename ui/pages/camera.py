@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea, QToolButton
+from PySide6.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QScrollArea, QToolButton, QSizePolicy
 from PySide6.QtGui import QFont, QImage, QPixmap, QImageReader, QIcon
 from PySide6.QtCore import Qt, Signal, QSize
 
@@ -34,7 +34,7 @@ class CameraMode(ModeBasic):
         self.status_label.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(self.status_label)
 
-        self.photo_button = QPushButton('СФОТКАТЬ', self)
+        self.photo_button = QPushButton('СФОТКАТЬ   ', self)
         self.photo_button.setFixedSize(420, 74)
         self.photo_button.setFont(QFont('Arial', 20, QFont.Bold))
         self.photo_button.setLayoutDirection(Qt.RightToLeft)
@@ -59,6 +59,7 @@ class CameraMode(ModeBasic):
         self.layout.addSpacing(24)
 
         self.gallery = PhotoGallery(self.photo_dir, self)
+        self.gallery.setGeometry(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
         self.gallery.closed.connect(self.gallery_closed.emit)
 
     @staticmethod
@@ -116,15 +117,24 @@ class PhotoGallery(QWidget):
         super().__init__(parent)
         self.photo_dir = Path(photo_dir)
         self.setFixedSize(SCREEN_WIDTH, SCREEN_HEIGHT)
-        self.setStyleSheet('background: white; color: black;')
+        self.setObjectName('photoGallery')
+        self.setStyleSheet('QWidget#photoGallery { background: #1F1F1F; color: white; }')
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        header = QHBoxLayout()
-        self.back_button = QPushButton('назад', self)
-        self.back_button.setFixedSize(150, 55)
+        header_widget = QWidget(self)
+        header_widget.setObjectName('galleryHeader')
+        header_widget.setFixedHeight(84)
+        header_widget.setStyleSheet('QWidget#galleryHeader { background-color: #1F1F1F; }')
+        header = QHBoxLayout(header_widget)
+        header.setContentsMargins(24, 14, 24, 14)
+        header.setSpacing(14)
+        self.back_button = QPushButton('', self)
+        self.back_button.setFixedSize(56, 56)
+        self.back_button.setIcon(make_colored_svg(icons.BACK, Qt.black))
+        self.back_button.setIconSize(QSize(28, 28))
         self.back_button.setStyleSheet(self._button_style())
         self.back_button.clicked.connect(self.back)
         header.addWidget(self.back_button)
@@ -132,32 +142,48 @@ class PhotoGallery(QWidget):
         self.title = QLabel('галерея', self)
         self.title.setAlignment(Qt.AlignCenter)
         self.title.setFont(QFont('Arial', 20, QFont.Bold))
+        self.title.setStyleSheet('color: white; background: transparent;')
         header.addWidget(self.title, 1)
 
         self.close_button = QPushButton('', self)
-        self.close_button.setFixedSize(65, 55)
+        self.close_button.setFixedSize(56, 56)
         self.close_button.setIcon(make_colored_svg(icons.CLOSE, Qt.black))
         self.close_button.setIconSize(QSize(28, 28))
         self.close_button.setStyleSheet(self._button_style())
         self.close_button.clicked.connect(self.close_gallery)
         header.addWidget(self.close_button)
-        layout.addLayout(header)
+        layout.addWidget(header_widget)
 
         self.scroll = QScrollArea(self)
         self.scroll.setWidgetResizable(True)
-        self.scroll.setStyleSheet('QScrollArea { border: none; background: white; }')
+        self.scroll.setStyleSheet('QScrollArea { border: none; background: #1F1F1F; } QScrollArea > QWidget > QWidget { background: #1F1F1F; }')
         self.grid_widget = QWidget()
+        self.grid_widget.setStyleSheet('background: #1F1F1F; color: white;')
         self.grid = QGridLayout(self.grid_widget)
         self.grid.setAlignment(Qt.AlignTop)
-        self.grid.setSpacing(16)
+        self.grid.setHorizontalSpacing(22)
+        self.grid.setVerticalSpacing(26)
+        self.grid.setContentsMargins(28, 20, 28, 28)
+        for column in range(4):
+            self.grid.setColumnStretch(column, 1)
         self.scroll.setWidget(self.grid_widget)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         layout.addWidget(self.scroll)
 
         self.preview = QLabel(self)
         self.preview.setAlignment(Qt.AlignCenter)
-        self.preview.setStyleSheet('background: white;')
+        self.preview.setStyleSheet('background: #1F1F1F;')
+        self.preview.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.preview.hide()
-        layout.addWidget(self.preview)
+        layout.addWidget(self.preview, 1)
+
+        self.preview_name = QLabel('', self)
+        self.preview_name.setFixedHeight(40)
+        self.preview_name.setAlignment(Qt.AlignCenter)
+        self.preview_name.setFont(QFont('Arial', 13))
+        self.preview_name.setStyleSheet('color: white; background: #1F1F1F;')
+        self.preview_name.hide()
+        layout.addWidget(self.preview_name)
 
         self.hide()
 
@@ -178,6 +204,7 @@ class PhotoGallery(QWidget):
     def open(self):
         self.photo_dir.mkdir(parents=True, exist_ok=True)
         self.preview.hide()
+        self.preview_name.hide()
         self.scroll.show()
         self._load_photos()
         self.show()
@@ -203,38 +230,60 @@ class PhotoGallery(QWidget):
         for i, path in enumerate(photos):
             reader = QImageReader(str(path))
             reader.setAutoTransform(True)
-            reader.setScaledSize(QSize(260, 165))
+            reader.setScaledSize(QSize(260, 164))
             image = reader.read()
-            button = QToolButton(self.grid_widget)
-            button.setFixedSize(285, 210)
-            button.setText('')
+
+            item = QWidget(self.grid_widget)
+            item.setStyleSheet('background: transparent;')
+            item.setFixedWidth(260)
+            item_layout = QVBoxLayout(item)
+            item_layout.setContentsMargins(0, 0, 0, 0)
+            item_layout.setSpacing(10)
+
+            button = QToolButton(item)
+            button.setFixedSize(260, 164)
             button.setIcon(QIcon(QPixmap.fromImage(image)))
-            button.setIconSize(QSize(260, 165))
+            button.setIconSize(QSize(260, 164))
             button.setToolButtonStyle(Qt.ToolButtonIconOnly)
             button.setStyleSheet('''
-                QToolButton { background: white; border: 2px solid #D4D4D4;
-                    border-radius: 12px; padding: 6px; }
-                QToolButton:hover { background: rgb(240, 240, 240); }
-                QToolButton:pressed { background: rgb(220, 220, 220); }
+                QToolButton { background: transparent; border: none; padding: 0; }
+                QToolButton:hover { background: rgb(245, 245, 245); }
+                QToolButton:pressed { background: rgb(235, 235, 235); }
             ''')
             button.clicked.connect(lambda checked=False, p=path: self.show_photo(p))
-            self.grid.addWidget(button, i // 4, i % 4)
+            item_layout.addWidget(button)
+
+            name = QLabel(path.name, item)
+            name.setFixedWidth(260)
+            name.setFont(QFont('Arial', 11))
+            name.setStyleSheet('color: white; background: transparent;')
+            name.setAlignment(Qt.AlignCenter)
+            name.setToolTip(path.name)
+            name.setText(name.fontMetrics().elidedText(path.name, Qt.ElideMiddle, 255))
+            item_layout.addWidget(name)
+
+            self.grid.addWidget(item, i // 4, i % 4, Qt.AlignTop | Qt.AlignHCenter)
 
     def show_photo(self, path):
         pixmap = QPixmap(str(path))
         if pixmap.isNull():
             return
+        self.scroll.hide()
+        self.preview_name.setText(path.name)
+        self.preview_name.setToolTip(path.name)
+        self.preview_name.show()
+        self.preview.show()
+        self.layout().activate()
         self.preview.setPixmap(pixmap.scaled(
-            SCREEN_WIDTH - 60, SCREEN_HEIGHT - 115,
+            QSize(max(1, self.preview.width() - 56), max(1, self.preview.height() - 24)),
             Qt.KeepAspectRatio, Qt.SmoothTransformation
         ))
-        self.scroll.hide()
-        self.preview.show()
 
     def back(self):
         if self.preview.isVisible():
             self.preview.clear()
             self.preview.hide()
+            self.preview_name.hide()
             self.scroll.show()
         else:
             self.close_gallery()
@@ -242,4 +291,5 @@ class PhotoGallery(QWidget):
     def close_gallery(self):
         self.hide()
         self.preview.clear()
+        self.preview_name.hide()
         self.closed.emit()
